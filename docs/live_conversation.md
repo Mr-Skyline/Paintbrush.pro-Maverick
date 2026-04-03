@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:14:54`
+- Updated: `2026-04-03 14:15:15`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1186`
+- Messages: `1188`
 
 ## Conversation
 
@@ -15950,3 +15950,21 @@ I also cleared the stale lock-holder process and relaunched autonomous continuou
 <user_query>
 Does on screen have any literature that explains how to operate the conditions while in take off window
 </user_query>
+
+### 1187. ASSISTANT
+
+I’ll quickly check official OST documentation sources and give you the exact places that explain condition behavior in the takeoff window.
+
+### 1188. ASSISTANT
+
+Yes — OST does have official literature for this.
+
+Best references for **conditions behavior in the Takeoff window**:
+
+- [On-Screen Takeoff User Guide](https://help.constructconnect.com/on-screen-takeoff-user-guide-68)
+- [Takeoff Tab: The Conditions Window](https://help.constructconnect.com/04-the-takeoff-tab-in-detail-71/on-screen-takeoff-04-04-takeoff-tab-the-conditions-window-681)
+- [Conditions and Layers (overview)](https://help.constructconnect.com/05-creating-conditions-and-layers-72)
+- [Assigning a Condition to a Layer](https://help.constructconnect.com/05-creating-conditions-and-layers-72/on-screen-takeoff-05-02-02-assigning-a-condition-to-a-layer-689)
+- [Creating Count Conditions](https://help.constructconnect.com/05-creating-conditions-and-layers-72/on-screen-takeoff-05-06-creating-count-conditions-696)
+
+If you want, I can pull the exact rules from those pages and convert them into a strict “Maverick operating spec” (what to do before click, during condition selection, and after takeoff).
