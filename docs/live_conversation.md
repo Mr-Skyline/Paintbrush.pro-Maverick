@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 13:24:41`
+- Updated: `2026-04-03 13:24:53`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1158`
+- Messages: `1160`
 
 ## Conversation
 
@@ -15687,3 +15687,13 @@ Proceed
 ### 1158. ASSISTANT
 
 Starting a full capture now with video + per-frame analysis enabled so we can mine `ceiling`/`gwb` signals from motion, not just snapshots. I’ll run it to completion and then report where the artifacts landed.
+
+### 1159. USER
+
+<user_query>
+OK but what are you capturing because the agent isn't doing anything
+</user_query>
+
+### 1160. ASSISTANT
+
+You’re right to call that out — this run is a **passive observer** capture (screen/video only), not a click/automation run. I’m checking the live output right now to confirm whether it’s actively capturing frames or if it’s stalled on window focus.
