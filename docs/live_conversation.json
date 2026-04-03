@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-04-03T11:52:15.857471",
+  "updated_at": "2026-04-03T11:53:46.350813",
   "source": "C:\\Users\\travi\\.cursor\\projects\\c-Users-travi-OneDrive-Documents-Paintbrush-pro\\agent-transcripts\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl",
-  "message_count": 1112,
+  "message_count": 1113,
   "messages": [
     {
       "role": "user",
@@ -4450,6 +4450,10 @@
     {
       "role": "assistant",
       "text": "Exactly \u2014 that explains it.\n\nSetting in the folder is fine **if it\u2019s in a file the script reads**.  \nRight now `ocr_engine.py` reads from **environment variables** (or `api_key` in `scripts/ocr_engine.config.json`), not automatically from `.env.txt`.\n\n## Fastest fix right now\nIn the same terminal session:\n\n```powershell\n$env:GLMOCR_API_KEY=\"your_real_zai_secret\"\n```\n\nThen say `retest now`.\n\n## Persistent fix (recommended)\nUse system env var:\n\n```powershell\nsetx GLMOCR_API_KEY \"your_real_zai_secret\"\n```\n\nThen restart Cursor/terminal and retest.\n\nIf you want, I can also patch `ocr_engine.py` to read `.env.txt` automatically (like the Grok connector), so folder-based key storage works without manual env export each session."
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nRetest now.\n</user_query>"
     }
   ]
 }
