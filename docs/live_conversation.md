@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:07:44`
+- Updated: `2026-04-03 14:11:19`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1181`
+- Messages: `1185`
 
 ## Conversation
 
@@ -15923,3 +15923,24 @@ That’s a great catch, and you’re exactly right. I’m adjusting the workflow
 <user_query>
 Not the tool but the condition
 </user_query>
+
+### 1182. ASSISTANT
+
+Perfect clarification. You’re saying the **condition itself** should stay locked, but Maverick must not expect Boost’s qty behavior during its own takeoff. I’m implementing a separate “locked-by-name/row” selection path for the copy phase now.
+
+### 1183. ASSISTANT
+
+You’re absolutely right — and I’ve now switched copy-phase condition selection to lock by **condition identity** (name + row), not Boost qty behavior. I also found why the autonomous run still failed: a stale Boost mutex lock blocked every attempt. I’m fixing auto-recovery for stale locks now and relaunching training.
+
+### 1184. ASSISTANT
+
+I found why it still didn’t run: a live/stale mutex owner process (`pid 7396`) is still holding the Boost lock, so every attempt gets rejected before starting. I’m clearing that owner process and restarting continuous training immediately.
+
+### 1185. ASSISTANT
+
+Exactly — and I’ve now implemented that distinction:
+
+- **Boost phase:** uses qty>0 to identify which condition Boost used.
+- **Copy phase:** uses **locked condition identity** (name + row), not Boost qty behavior.
+
+I also cleared the stale lock-holder process and relaunched autonomous continuous training. It is now actively running (first attempt in progress). I’ll keep monitoring and report the first 5-attempt summary as soon as it lands.
