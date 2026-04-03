@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:36:23`
+- Updated: `2026-04-03 11:37:12`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1082`
+- Messages: `1086`
 
 ## Conversation
 
@@ -15162,3 +15162,111 @@ When you want, I’ll resume from where we paused:
 - training loop continuation with the new safeguards
 
 Say `resume build` and I’ll pick it up immediately.
+
+### 1083. USER
+
+<user_query>
+Okay, so earlier we were talking about a New Screen reader. Um, through z.ai What do I need to do? to set that up on my end.
+</user_query>
+
+### 1084. ASSISTANT
+
+On your end, you only need to do 4 things.
+
+## 1) Get a Z.ai API key
+- Create/sign in to Z.ai developer console
+- Generate an API key for GLM models
+- Keep it private (don’t put it in tracked files)
+
+## 2) Set env var on your machine
+In PowerShell:
+
+```powershell
+setx GLMOCR_API_KEY "your_zai_key_here"
+```
+
+Then restart Cursor/terminal (required for `setx`).
+
+## 3) Confirm config values
+Your project is already wired for this path. Verify `scripts/ocr_engine.config.json` has:
+
+- `api_style`: `openai_chat_completions`
+- `endpoint`: either  
+  - `https://api.z.ai/api/paas/v4`  
+  - or `https://api.z.ai/api/coding/paas/v4`
+- `model`: `glm-4.6v` (or your available vision model)
+- optional fallbacks: `glm-4v`, `glm-4.7`
+- `fallback_to_tesseract: true`
+
+## 4) Run a smoke test
+From project root:
+
+```powershell
+python -c "import numpy as np, cv2, json; from scripts.ocr_engine import create_ocr_engine; img=np.full((80,320,3),255,dtype=np.uint8); cv2.putText(img,'Takeoff 123',(10,50),cv2.FONT_HERSHEY_SIMPLEX,1.0,(0,0,0),2,cv2.LINE_AA); o=create_ocr_engine('scripts/ocr_engine.config.json'); r=o.ocr_text(img, context='Extract visible text exactly.'); print(json.dumps({'engine_used':r.get('engine_used'),'fallback_used':r.get('fallback_used'),'reason':r.get('fallback_reason'),'text':r.get('text')}, indent=2))"
+```
+
+Expected success:
+- `engine_used: "glmocr"`
+- `fallback_used: false`
+
+If you get `401`:
+- key invalid/missing or wrong account scope
+
+If `404`:
+- endpoint/model mismatch (switch `/paas/v4` vs `/coding/paas/v4`, or model name)
+
+If you want, after you set the key, say `retest now` and I’ll run/verify it for you immediately.
+
+### 1085. USER
+
+<user_query>
+Okay, so earlier we were talking about a New Screen reader. Um, through z.ai What do I need to do? to set that up on my end.
+</user_query>
+
+### 1086. ASSISTANT
+
+On your end, you only need to do 4 things.
+
+## 1) Get a Z.ai API key
+- Create/sign in to Z.ai developer console
+- Generate an API key for GLM models
+- Keep it private (don’t put it in tracked files)
+
+## 2) Set env var on your machine
+In PowerShell:
+
+```powershell
+setx GLMOCR_API_KEY "your_zai_key_here"
+```
+
+Then restart Cursor/terminal (required for `setx`).
+
+## 3) Confirm config values
+Your project is already wired for this path. Verify `scripts/ocr_engine.config.json` has:
+
+- `api_style`: `openai_chat_completions`
+- `endpoint`: either  
+  - `https://api.z.ai/api/paas/v4`  
+  - or `https://api.z.ai/api/coding/paas/v4`
+- `model`: `glm-4.6v` (or your available vision model)
+- optional fallbacks: `glm-4v`, `glm-4.7`
+- `fallback_to_tesseract: true`
+
+## 4) Run a smoke test
+From project root:
+
+```powershell
+python -c "import numpy as np, cv2, json; from scripts.ocr_engine import create_ocr_engine; img=np.full((80,320,3),255,dtype=np.uint8); cv2.putText(img,'Takeoff 123',(10,50),cv2.FONT_HERSHEY_SIMPLEX,1.0,(0,0,0),2,cv2.LINE_AA); o=create_ocr_engine('scripts/ocr_engine.config.json'); r=o.ocr_text(img, context='Extract visible text exactly.'); print(json.dumps({'engine_used':r.get('engine_used'),'fallback_used':r.get('fallback_used'),'reason':r.get('fallback_reason'),'text':r.get('text')}, indent=2))"
+```
+
+Expected success:
+- `engine_used: "glmocr"`
+- `fallback_used: false`
+
+If you get `401`:
+- key invalid/missing or wrong account scope
+
+If `404`:
+- endpoint/model mismatch (switch `/paas/v4` vs `/coding/paas/v4`, or model name)
+
+If you want, after you set the key, say `retest now` and I’ll run/verify it for you immediately.
