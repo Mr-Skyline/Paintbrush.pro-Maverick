@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 15:26:31`
+- Updated: `2026-04-03 15:27:29`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1234`
+- Messages: `1236`
 
 ## Conversation
 
@@ -16407,3 +16407,17 @@ Understood — we’ll pivot away from Boost and design a GLM-OCR + reasoning-fi
 ### 1234. ASSISTANT
 
 I’m quickly mapping the current non-Boost execution path and GLM-OCR hooks so the plan is implementation-ready and fast.
+
+### 1235. USER
+
+<user_query>
+No-Boost GLM Logic Plan
+
+Implement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself.
+
+To-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos.
+</user_query>
+
+### 1236. ASSISTANT
+
+I’m implementing this now in order, starting by hardening strict no-Boost area mode (`ceiling`/`gwb` only + mandatory style read), then I’ll move through OCR pre-read, polygon planner, telemetry loop, and QA gates.
