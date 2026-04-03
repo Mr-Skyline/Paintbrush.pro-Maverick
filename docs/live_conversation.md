@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:29:46`
+- Updated: `2026-04-03 14:38:47`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1200`
+- Messages: `1201`
 
 ## Conversation
 
@@ -16044,3 +16044,9 @@ I’ll keep it running and continue monitoring; as soon as the first block summa
 - lock success/failure reasons
 - condition-match status (`ceiling`/`gwb` + row lock)
 - geometry pass/fail reasons
+
+### 1201. USER
+
+<user_query>
+Important for you to understand how to identify whether or not a condition is an area condition a linear or a count The only way to do it is by opening the condition and reading the style drop down menu line It will tell you what the condition is The agent can then learn about the rest of the condition and then close the condition. Now that the agent knows the type of condition that it is it will know how to use it an area condition will require multiple clicks in order to form a Polygon shape a linear condition will require a single Click to start and then a single Click to keep the line following a particular path at a corner or a joint on the Polygon or between polygons To terminate the line of a linear takeoff a double click is required. the count condition is pretty straightforward it counts I like to have it count specific items Like door frames and doors but it needs to have logic like what does a door frame look like on a set of plans and how do I know that there is a door here If there is a door frame there is likely a door or if the plan doesn't show a frame but it shows then there is likely a frame as well. It needs to know how to identify things like windows, Sinks and toilets. It might be a good idea to find a database that we can tap into that teach you how to read plans better We're wanting something that You with examples of all the various things that we might find in a set of blueprints regarding Symbols, textures, patterns. You might also asked for help researching databases that have the information Readily available and open source
+</user_query>
