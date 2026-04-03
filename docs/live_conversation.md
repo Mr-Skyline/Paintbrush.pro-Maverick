@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 12:36:55`
+- Updated: `2026-04-03 12:40:58`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1113`
+- Messages: `1116`
 
 ## Conversation
 
@@ -15218,3 +15218,41 @@ If you want, I’ll implement this as a **new “accelerated-learning” run pro
 <user_query>
 Proceed and I will evaluate and let you know if I want any changes before you proceed on to the next round
 </user_query>
+
+### 1114. ASSISTANT
+
+Proceeding. I’ll set up the accelerated-learning profile as Round 1 (single-page teacher loop, strict gates, 5 attempts), run it once, and then stop for your evaluation before any Round 2.
+
+### 1115. ASSISTANT
+
+Round 1 is now running in the exact Boost→Analyze→Erase→Copy flow. I’ll stop after this round and wait for your evaluation before doing anything else.
+
+### 1116. ASSISTANT
+
+Round 1 complete. I stopped after this round as requested.
+
+### Round 1 result (Boost -> Analyze -> Erase -> Copy)
+- Boost run: **success** (`boost_exit_code: 0`)
+- Boost erase: **success** (`erase_exit_code: 0`)
+- Copy attempt: **failed** (`copy_ok: false`, exit code `5`)
+- Artifact: `output/ost-training-lab/boost_then_copy_attempt_TP-0001_20260403_124020.json`
+
+### What failed
+- Hard gate failed at **condition verification**:
+  - `reason: condition_verification_failed`
+  - Selected condition OCR text was noisy/unusable:
+    - `"LS } = Feet ..."`
+  - `preferred_keyword_hit: false` for ceiling/GWB aliases
+  - It clicked a valid active row (qty `3.0`), but not a verified ceiling/GWB row
+
+### Important fix applied before this run
+- I added a speed fix so dense row scanning uses fast local OCR for condition rows (to prevent hangs), while keeping the GLM adapter path active overall.
+
+---
+
+If you want, for **Round 2** I can apply one targeted change first:
+1) increase condition verification retries + stricter keyword normalization for ceiling/GWB, or  
+2) force preferred-condition match (do not proceed unless keyword hit is true), or  
+3) switch first-pass row selection to second row and retry gate.
+
+Tell me which one you want for the next round.
