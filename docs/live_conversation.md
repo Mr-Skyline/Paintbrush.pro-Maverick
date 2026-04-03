@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:37:12`
+- Updated: `2026-04-03 11:40:08`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1086`
+- Messages: `1090`
 
 ## Conversation
 
@@ -15270,3 +15270,53 @@ If `404`:
 - endpoint/model mismatch (switch `/paas/v4` vs `/coding/paas/v4`, or model name)
 
 If you want, after you set the key, say `retest now` and I’ll run/verify it for you immediately.
+
+### 1087. USER
+
+<user_query>
+What if we just switch models from Premium to Claude Opus 4.6
+</user_query>
+
+### 1088. ASSISTANT
+
+You can switch **your Cursor assistant model** to Claude, yes — but that won’t automatically replace the OCR model your build is calling.
+
+Two separate layers:
+
+- **Cursor chat/agent model** (what I run as)
+- **App runtime OCR model** (what `scripts/ocr_engine.py` calls during training)
+
+So if you switch to Claude in Cursor:
+- better planning/coding assistance ✅
+- no change to Z.ai/GLM OCR inference path in your scripts ❌ (unless we edit config/code)
+
+Also: there isn’t a standard public model name I recognize as **“Claude Opus 4.6”** specifically; in Cursor, use whatever Claude Opus option is actually listed in your model picker.
+
+If you want, I can do either:
+1. keep Claude for coding + keep GLM for OCR (best blend), or  
+2. modify runtime OCR to use a different provider/model path.
+
+### 1089. USER
+
+<user_query>
+What if we just switch models from Premium to Claude Opus 4.6
+</user_query>
+
+### 1090. ASSISTANT
+
+You can switch **your Cursor assistant model** to Claude, yes — but that won’t automatically replace the OCR model your build is calling.
+
+Two separate layers:
+
+- **Cursor chat/agent model** (what I run as)
+- **App runtime OCR model** (what `scripts/ocr_engine.py` calls during training)
+
+So if you switch to Claude in Cursor:
+- better planning/coding assistance ✅
+- no change to Z.ai/GLM OCR inference path in your scripts ❌ (unless we edit config/code)
+
+Also: there isn’t a standard public model name I recognize as **“Claude Opus 4.6”** specifically; in Cursor, use whatever Claude Opus option is actually listed in your model picker.
+
+If you want, I can do either:
+1. keep Claude for coding + keep GLM for OCR (best blend), or  
+2. modify runtime OCR to use a different provider/model path.
