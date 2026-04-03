@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-04-03T14:41:56.726377",
+  "updated_at": "2026-04-03T14:46:26.181239",
   "source": "C:\\Users\\travi\\.cursor\\projects\\c-Users-travi-OneDrive-Documents-Paintbrush-pro\\agent-transcripts\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl",
-  "message_count": 1206,
+  "message_count": 1209,
   "messages": [
     {
       "role": "user",
@@ -4826,6 +4826,18 @@
     {
       "role": "assistant",
       "text": "Great \u2014 I\u2019ll build that symbol knowledge pipeline now: ingestion + indexed storage + nearest-match query, and wire it into CLI commands so you can feed open datasets in incrementally."
+    },
+    {
+      "role": "assistant",
+      "text": "I\u2019m now implementing the symbol knowledge ingestion/query pipeline itself (local index + embeddings + nearest-class lookup), and I\u2019ll expose it in the orchestrator so you can start feeding FloorPlanCAD/CVC-FP style datasets right away."
+    },
+    {
+      "role": "assistant",
+      "text": "Core files are in place. I\u2019m running a quick syntax/health check now so this is immediately usable."
+    },
+    {
+      "role": "assistant",
+      "text": "Implemented. Maverick now has a local **symbol knowledge ingestion + query pipeline** you can use immediately.\n\n### What I added\n\n- New shared symbol feature module: `scripts/ost_symbol_knowledge.py`\n  - Image embedding extraction for blueprint symbols (shape + line orientation + density features)\n  - Cosine similarity utility\n  - JSON/JSONL helpers\n\n- New ingestion command: `scripts/ost_symbol_knowledge_ingest.py`\n  - Scans a labeled dataset folder (`class_name/*.png|jpg|...`)\n  - Builds per-class prototype embeddings\n  - Writes:\n    - embeddings JSONL\n    - timestamped symbol index JSON\n    - `symbol_index_latest.json`\n\n- New query command: `scripts/ost_symbol_knowledge_query.py`\n  - Takes one symbol crop image\n  - Computes embedding\n  - Returns top matching classes from the local symbol index\n\n- Orchestrator wiring in `scripts/ost_orchestrator.py`\n  - Added subcommands:\n    - `symbol-knowledge-ingest`\n    - `symbol-knowledge-query`\n\n- Usage doc: `docs/symbol_knowledge_pipeline.md`\n\n### Validation done\n\n- Syntax check passed for all modified scripts.\n- Lints passed for all modified scripts.\n- Confirmed new orchestrator commands appear in `--help`.\n\n### Run it\n\n- Ingest:\n  - `python scripts/ost_orchestrator.py symbol-knowledge-ingest --project-id TP-0001 --dataset-root \"C:\\path\\to\\dataset\" --dataset-name floorplancad`\n- Query:\n  - `python scripts/ost_orchestrator.py symbol-knowledge-query --image \"C:\\path\\to\\crop.png\" --index-json \"output/ost-training-lab/symbol_knowledge/TP-0001/symbol_index_latest.json\" --top-k 5`\n\nIf you want, I\u2019ll run the first ingest now \u2014 send me the dataset folder path you want to start with."
     }
   ]
 }

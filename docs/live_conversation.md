@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:41:56`
+- Updated: `2026-04-03 14:46:26`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1206`
+- Messages: `1209`
 
 ## Conversation
 
@@ -16115,3 +16115,57 @@ Do that
 ### 1206. ASSISTANT
 
 Great — I’ll build that symbol knowledge pipeline now: ingestion + indexed storage + nearest-match query, and wire it into CLI commands so you can feed open datasets in incrementally.
+
+### 1207. ASSISTANT
+
+I’m now implementing the symbol knowledge ingestion/query pipeline itself (local index + embeddings + nearest-class lookup), and I’ll expose it in the orchestrator so you can start feeding FloorPlanCAD/CVC-FP style datasets right away.
+
+### 1208. ASSISTANT
+
+Core files are in place. I’m running a quick syntax/health check now so this is immediately usable.
+
+### 1209. ASSISTANT
+
+Implemented. Maverick now has a local **symbol knowledge ingestion + query pipeline** you can use immediately.
+
+### What I added
+
+- New shared symbol feature module: `scripts/ost_symbol_knowledge.py`
+  - Image embedding extraction for blueprint symbols (shape + line orientation + density features)
+  - Cosine similarity utility
+  - JSON/JSONL helpers
+
+- New ingestion command: `scripts/ost_symbol_knowledge_ingest.py`
+  - Scans a labeled dataset folder (`class_name/*.png|jpg|...`)
+  - Builds per-class prototype embeddings
+  - Writes:
+    - embeddings JSONL
+    - timestamped symbol index JSON
+    - `symbol_index_latest.json`
+
+- New query command: `scripts/ost_symbol_knowledge_query.py`
+  - Takes one symbol crop image
+  - Computes embedding
+  - Returns top matching classes from the local symbol index
+
+- Orchestrator wiring in `scripts/ost_orchestrator.py`
+  - Added subcommands:
+    - `symbol-knowledge-ingest`
+    - `symbol-knowledge-query`
+
+- Usage doc: `docs/symbol_knowledge_pipeline.md`
+
+### Validation done
+
+- Syntax check passed for all modified scripts.
+- Lints passed for all modified scripts.
+- Confirmed new orchestrator commands appear in `--help`.
+
+### Run it
+
+- Ingest:
+  - `python scripts/ost_orchestrator.py symbol-knowledge-ingest --project-id TP-0001 --dataset-root "C:\path\to\dataset" --dataset-name floorplancad`
+- Query:
+  - `python scripts/ost_orchestrator.py symbol-knowledge-query --image "C:\path\to\crop.png" --index-json "output/ost-training-lab/symbol_knowledge/TP-0001/symbol_index_latest.json" --top-k 5`
+
+If you want, I’ll run the first ingest now — send me the dataset folder path you want to start with.
