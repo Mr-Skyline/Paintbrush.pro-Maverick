@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:51:38`
+- Updated: `2026-04-03 11:52:15`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1110`
+- Messages: `1112`
 
 ## Conversation
 
@@ -15534,3 +15534,36 @@ python -c "import os; print('has_key=', bool(os.environ.get('GLMOCR_API_KEY')))"
 ```
 
 If it prints `has_key= True`, tell me `retest now` and I’ll verify again immediately.
+
+### 1111. USER
+
+<user_query>
+Thank you Oh I set those in the Paintbrush.pro folder
+</user_query>
+
+### 1112. ASSISTANT
+
+Exactly — that explains it.
+
+Setting in the folder is fine **if it’s in a file the script reads**.  
+Right now `ocr_engine.py` reads from **environment variables** (or `api_key` in `scripts/ocr_engine.config.json`), not automatically from `.env.txt`.
+
+## Fastest fix right now
+In the same terminal session:
+
+```powershell
+$env:GLMOCR_API_KEY="your_real_zai_secret"
+```
+
+Then say `retest now`.
+
+## Persistent fix (recommended)
+Use system env var:
+
+```powershell
+setx GLMOCR_API_KEY "your_real_zai_secret"
+```
+
+Then restart Cursor/terminal and retest.
+
+If you want, I can also patch `ocr_engine.py` to read `.env.txt` automatically (like the Grok connector), so folder-based key storage works without manual env export each session.
