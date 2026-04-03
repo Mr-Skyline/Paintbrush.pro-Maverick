@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 12:05:01`
+- Updated: `2026-04-03 12:30:28`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1102`
+- Messages: `1108`
 
 ## Conversation
 
@@ -15118,3 +15118,27 @@ Proceeding — I’m monitoring the restarted 10-attempt block to completion, th
 <user_query>
 What's taking so long
 </user_query>
+
+### 1103. ASSISTANT
+
+It’s taking long because this batch command doesn’t stream per-attempt progress to terminal, so it looks idle while doing UI/OCR waits between attempts. I’m checking whether attempts are actually being written right now; if not, I’ll restart with a tighter/visible run profile.
+
+### 1104. ASSISTANT
+
+You’re right to call it out — that run was effectively stalled (no new artifacts). I killed it and switched to a short 3-attempt probe to confirm the pipeline is actually progressing before we burn time on 10/20 again. I’ll report back as soon as this probe finishes.
+
+### 1105. ASSISTANT
+
+Root cause found: the new mouse-takeover safety pause is likely retriggering while you’re moving the mouse, which can stretch runs massively by design. I’ll run a 1-attempt health check right now; if it completes quickly, we’ll continue the full block when the mouse is idle.
+
+### 1106. ASSISTANT
+
+Found the slowdown cause: multiple orphaned validation processes were stacked and competing (18 active OST Python workers). I killed all of them and confirmed zero remain. I’m now running one clean probe; once it completes, I’ll proceed with the full block.
+
+### 1107. ASSISTANT
+
+I found the true bottleneck: condition selection was calling remote GLM OCR repeatedly for every row/qty variant, which is too slow for batch runs. I applied a fast-scan fix (local tesseract for dense row scanning) and cleared stale workers. Running a clean probe again now.
+
+### 1108. ASSISTANT
+
+Quick update: the speed fix worked (1-attempt probe completed in ~22s), and the full 10→20 validation run is in progress now. It still won’t print per-attempt logs, but this should finish much faster than before.
