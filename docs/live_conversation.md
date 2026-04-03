@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 10:29:45`
+- Updated: `2026-04-03 10:31:19`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1051`
+- Messages: `1053`
 
 ## Conversation
 
@@ -14860,3 +14860,23 @@ Yes do that
 ### 1051. ASSISTANT
 
 Got it — I’ll make this persistent by adding a Windows Scheduled Task that launches the conversation sync at logon, then I’ll register it now and verify it’s enabled.
+
+### 1052. ASSISTANT
+
+I hit a Windows permission block for Scheduled Tasks on this account, so I’m applying a user-level fallback that does the same thing: auto-start the sync at logon via your Startup folder (no admin needed).
+
+### 1053. ASSISTANT
+
+Done — it’s now set to auto-start at login.
+
+I couldn’t register a Scheduled Task because Windows returned **Access is denied** for this account, so I installed the user-level startup launcher instead (works without admin):
+
+- `C:\Users\travi\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\PaintbrushConversationSync.cmd`
+
+This launches:
+
+- `powershell.exe -ExecutionPolicy Bypass -File "C:\Users\travi\OneDrive\Documents\Paintbrush.pro\scripts\start_conversation_sync.ps1"`
+
+So each login will automatically start your live conversation-to-GitHub sync.
+
+If you want, I can also add a one-click `disable` script for this Startup entry.
