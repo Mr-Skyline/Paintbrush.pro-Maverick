@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 10:50:46`
+- Updated: `2026-04-03 10:51:49`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1061`
+- Messages: `1064`
 
 ## Conversation
 
@@ -14966,3 +14966,33 @@ If you want, I can do the hardening now in one shot:
 <user_query>
 no thats too much. Let get back to the build we can lock down later. Just make sure no api keys are visible 
 </user_query>
+
+### 1062. ASSISTANT
+
+Understood — keeping scope light and returning to the build. I’ll do a strict key visibility scan right now (focused on what could be publicly visible), then continue.
+
+### 1063. ASSISTANT
+
+I found an actual exposed secret in tracked files (Telegram bot tokens). I’m removing those files from git tracking right now and ignoring them so they won’t be visible going forward.
+
+### 1064. ASSISTANT
+
+Good catch — I found and fixed a real exposure.
+
+What I did right now:
+- Found **Telegram bot tokens** in tracked files:
+  - `telegram.txt`
+  - `telegram-1.txt`
+- Removed both from git tracking.
+- Added `telegram*.txt` to `.gitignore` so they stay private.
+
+Current status:
+- No token-pattern matches in current tracked workspace files.
+- **Important:** those tokens were already committed earlier, so if repo is public they should be treated as compromised.
+
+Do this next (urgent, quick):
+1. Rotate both Telegram bot tokens in BotFather (`/revoke` then new token).
+2. Update your local secret storage (`.env.txt` or secure env var), not files in repo.
+3. I can push this cleanup immediately, and if you want, I can also do history cleanup after.
+
+If you say `push cleanup`, I’ll push the removal now.
