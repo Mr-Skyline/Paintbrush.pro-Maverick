@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 13:23:39`
+- Updated: `2026-04-03 13:24:41`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1157`
+- Messages: `1158`
 
 ## Conversation
 
@@ -15683,3 +15683,7 @@ If you want, I can run one capture session now and then summarize the exact fram
 <user_query>
 Proceed
 </user_query>
+
+### 1158. ASSISTANT
+
+Starting a full capture now with video + per-frame analysis enabled so we can mine `ceiling`/`gwb` signals from motion, not just snapshots. I’ll run it to completion and then report where the artifacts landed.
