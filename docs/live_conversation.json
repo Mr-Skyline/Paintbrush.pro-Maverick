@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-04-03T12:52:38.950492",
+  "updated_at": "2026-04-03T12:54:11.896085",
   "source": "C:\\Users\\travi\\.cursor\\projects\\c-Users-travi-OneDrive-Documents-Paintbrush-pro\\agent-transcripts\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl",
-  "message_count": 1123,
+  "message_count": 1125,
   "messages": [
     {
       "role": "user",
@@ -4494,6 +4494,14 @@
     {
       "role": "assistant",
       "text": "Agreed. I\u2019m enforcing this strictly in code now: condition matching will only allow names containing `ceiling` or `gwb`, and the boost-copy workflow will fail early if it can\u2019t lock one of those two by name."
+    },
+    {
+      "role": "assistant",
+      "text": "Enforced. The agent now treats condition logic exactly as you stated: **only `ceiling` or `gwb` by condition name** is valid. I\u2019m running one round now so you can evaluate behavior before any further rounds."
+    },
+    {
+      "role": "assistant",
+      "text": "You were right, and it\u2019s now enforced exactly.\n\nWhat I changed:\n- Condition selector now **rejects any row** that does not match preferred condition names.\n- Preferred condition names are now strict default:\n  - `ceiling,gwb`\n- Boost->copy flow now **fails early** unless it locks to one of those names and captures a row index.\n\nRound result after change:\n- Completed quickly (~30s), no long drift\n- Boost succeeded\n- Copy intentionally blocked with:\n  - `reason: boost_condition_not_locked_to_ceiling_or_gwb`\n  - `selected_condition_keyword: \"\"`\n  - `expected_condition_row_index: -1`\n\nThis is the correct fail behavior under your rule: if it can\u2019t prove the condition is ceiling or GWB by name, it does not continue.\n\nIf you approve, next step is to improve only the condition-name OCR clarity in the conditions panel so it can reliably lock `ceiling`/`gwb` and then proceed to shape matching."
     }
   ]
 }
