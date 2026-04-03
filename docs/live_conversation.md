@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 12:34:51`
+- Updated: `2026-04-03 12:35:53`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1110`
+- Messages: `1112`
 
 ## Conversation
 
@@ -15152,3 +15152,63 @@ OK can we get back actual training and using take off boost then teaching the ag
 ### 1110. ASSISTANT
 
 Yes — switching now from validation to real training flow: **Boost -> snapshot/analyze -> erase -> copy attempt**. I’m stopping the current 20-block run and starting the boost-driven training sequence.
+
+### 1111. USER
+
+<user_query>
+Or would it be better to Design a plan that would expedite the learning process Now that we have better eyeballs
+</user_query>
+
+### 1112. ASSISTANT
+
+Yes — **that’s the better move right now**.
+
+Now that GLM vision is working, the fastest path is a **short, tight learning plan** instead of brute-force attempts.
+
+## Accelerated Learning Plan (with “better eyeballs”)
+
+1. **Stabilize one golden loop first**
+- Workflow: `Boost -> wait/verify -> snapshot -> erase -> copy`
+- Use **one page**, **one condition family** (ceiling/GWB), **one attempt style**
+- Goal: remove variability before scaling
+
+2. **Create a “teacher target” artifact per attempt**
+- Save:
+  - boost snapshot
+  - selected condition row + qty
+  - target region bbox/center
+  - first click point + stroke path
+- This becomes the ground-truth that the copy attempt must match
+
+3. **Two-stage OCR strategy**
+- Keep fast local scan for row discovery
+- Use GLM only for high-value reads (target verification + ambiguous labels)
+- This gives speed + better perception where it matters
+
+4. **Hard gates before drawing**
+- Don’t draw unless all pass:
+  - active condition found (qty > 0)
+  - not unassigned
+  - target in expected boost region
+  - item-type match confidence above threshold
+- If any fail: auto-adjust and retry, no blind clicks
+
+5. **Micro-batch learning cadence**
+- Run in blocks of **5 attempts**
+- After each block:
+  - apply 1 concrete adjustment from self-review
+  - rerun next block
+- Don’t do long 20+ blocks until 2 consecutive 5-blocks improve
+
+6. **Success criteria to unlock scale**
+- Condition verification pass rate >= 80%
+- Match score median improving block-over-block
+- Bad-work rate trending down for 2 blocks
+- Then expand to 10, then 20 attempts
+
+## Why this is faster
+- You learn from clean, comparable data
+- Fewer wasted attempts
+- GLM vision is used where it gives leverage, not everywhere
+
+If you want, I’ll implement this as a **new “accelerated-learning” run profile** in the orchestrator and start the first 5-attempt teaching block immediately.
