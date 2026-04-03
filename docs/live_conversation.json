@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-04-03T11:51:24.719294",
+  "updated_at": "2026-04-03T11:51:38.896020",
   "source": "C:\\Users\\travi\\.cursor\\projects\\c-Users-travi-OneDrive-Documents-Paintbrush-pro\\agent-transcripts\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl",
-  "message_count": 1108,
+  "message_count": 1110,
   "messages": [
     {
       "role": "user",
@@ -4434,6 +4434,14 @@
     {
       "role": "user",
       "text": "<user_query>\nkeys are set\n</user_query>"
+    },
+    {
+      "role": "assistant",
+      "text": "Perfect \u2014 I\u2019ll run one more live retest now from this session and confirm whether GLM is active."
+    },
+    {
+      "role": "assistant",
+      "text": "Thanks \u2014 I tested immediately, and this terminal still shows:\n\n- `has_key: false` (no `GLMOCR_API_KEY` visible in this running session)\n- GLM request still returns `401`, then falls back to Tesseract.\n\nSo your key is likely set in a **different shell/session** (or via `setx` but not reloaded here yet).\n\nRun this in the same terminal/session you want tests from:\n\n```powershell\n$env:GLMOCR_API_KEY=\"YOUR_SECRET_KEY\"\npython -c \"import os; print('has_key=', bool(os.environ.get('GLMOCR_API_KEY')))\"\n```\n\nIf it prints `has_key= True`, tell me `retest now` and I\u2019ll verify again immediately."
     }
   ]
 }

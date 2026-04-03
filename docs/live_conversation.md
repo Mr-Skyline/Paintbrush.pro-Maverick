@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:51:24`
+- Updated: `2026-04-03 11:51:38`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1108`
+- Messages: `1110`
 
 ## Conversation
 
@@ -15512,3 +15512,25 @@ If you used `setx`, restart Cursor/terminal first (it won’t affect already-ope
 <user_query>
 keys are set
 </user_query>
+
+### 1109. ASSISTANT
+
+Perfect — I’ll run one more live retest now from this session and confirm whether GLM is active.
+
+### 1110. ASSISTANT
+
+Thanks — I tested immediately, and this terminal still shows:
+
+- `has_key: false` (no `GLMOCR_API_KEY` visible in this running session)
+- GLM request still returns `401`, then falls back to Tesseract.
+
+So your key is likely set in a **different shell/session** (or via `setx` but not reloaded here yet).
+
+Run this in the same terminal/session you want tests from:
+
+```powershell
+$env:GLMOCR_API_KEY="YOUR_SECRET_KEY"
+python -c "import os; print('has_key=', bool(os.environ.get('GLMOCR_API_KEY')))"
+```
+
+If it prints `has_key= True`, tell me `retest now` and I’ll verify again immediately.
