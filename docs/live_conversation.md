@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:47:13`
+- Updated: `2026-04-03 11:47:28`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1105`
+- Messages: `1107`
 
 ## Conversation
 
@@ -15479,3 +15479,30 @@ Then say `retest now` and I’ll verify GLM OCR is working.
 <user_query>
 retest now
 </user_query>
+
+### 1106. ASSISTANT
+
+Running the GLM OCR smoke retest now and I’ll report whether it’s using GLM directly or falling back.
+
+### 1107. ASSISTANT
+
+Retest result: GLM still not authorized.
+
+- `engine_used`: `tesseract`
+- `fallback_used`: `true`
+- GLM failure: `HTTP 401 Unauthorized`
+
+So wiring is good, but auth is still failing for the current runtime process.
+
+Quick fix checklist:
+1. Ensure new **secret key** (not key ID) is set:
+   ```powershell
+   $env:GLMOCR_API_KEY="YOUR_NEW_SECRET"
+   ```
+2. Verify it exists in the same terminal session:
+   ```powershell
+   echo $env:GLMOCR_API_KEY
+   ```
+3. Re-run test in that same terminal.
+
+If you used `setx`, restart Cursor/terminal first (it won’t affect already-open sessions).
