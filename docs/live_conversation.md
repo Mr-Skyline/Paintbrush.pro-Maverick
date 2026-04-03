@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 13:20:42`
+- Updated: `2026-04-03 13:23:22`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1149`
+- Messages: `1156`
 
 ## Conversation
 
@@ -15596,3 +15596,84 @@ If you want, I’ll now run an autonomous retry cycle (multiple full Boost->Anal
 <user_query>
 One of the things that appears to be happening in that last run was instead deleting the take off that was completed by after taking the snapshot it was doing a control a copy and control V paste I know this because the quantity The two conditions doubled
 </user_query>
+
+### 1150. ASSISTANT
+
+Good catch — that behavior would definitely corrupt training. I’m going to trace where post-snapshot cleanup runs and harden it so it can only perform delete/undo actions (never copy/paste), then I’ll patch it and revalidate.
+
+### 1151. ASSISTANT
+
+I found a likely root cause: I had added a Boost retry loop that could run Boost multiple times, which can look like copy/paste doubling. I’m removing that and switching post-snapshot cleanup to explicit `Ctrl+A` + `Delete` so it always clears instead of relying on undo state.
+
+### 1152. ASSISTANT
+
+You’re right — that doubling symptom is unacceptable, and I found a likely cause in the workflow logic.
+
+I fixed two things to prevent it:
+
+- Removed the **Boost auto-retry loop** I had added.  
+  - That loop could run Boost more than once in a single cycle, which can look like duplicate copy/paste behavior and double quantities.
+
+- Changed post-snapshot “erase Boost work” to explicit **clear** (`Ctrl+A` + `Delete`) instead of undo-state-dependent behavior.  
+  - In `scripts/ost_training_lab.py`, the Boost cleanup command now uses `--mode clear`.
+  - Clear count is bounded for safety.
+
+This keeps your required behavior: snapshot Boost, then actually remove the Boost output before the agent attempts its own takeoff.
+
+If you want, I’ll run one fresh cycle right now and report back the exact cleanup command + resulting quantities from the output JSON so we can confirm no doubling.
+
+### 1153. USER
+
+<user_query>
+I think it would be a good idea for you do a video capture and then analyze it frame by frame as another way teach the agent
+</user_query>
+
+### 1154. ASSISTANT
+
+Yes, that’s a strong idea. I’m going to add a dedicated video-capture + frame-analysis path so Maverick can learn from full motion (not just single snapshots), then wire it into the orchestrator as a runnable command.
+
+### 1155. ASSISTANT
+
+I’ve found a clean path: I’m extending `maverick-style-walk` to also emit an MP4 and a frame-by-frame analysis report (including condition keyword hits), so training can learn from motion sequences directly.
+
+### 1156. ASSISTANT
+
+Excellent direction — I implemented it.
+
+You now have a **video capture + frame-by-frame analysis** mode built into the existing style-walk flow.
+
+### What’s added
+
+- Updated `scripts/ost_style_walk.py` to:
+  - capture normal frame screenshots as before
+  - optionally compile them into an MP4 (`style_walk_capture.mp4`)
+  - emit a per-frame analysis file (`frame_analysis.json`) with:
+    - frame index/path
+    - visual diff
+    - text-changed flag
+    - OCR preview
+    - condition keyword hits (`ceiling`, `gwb`) and quantity tokens
+
+- Updated `scripts/ost_orchestrator.py` `maverick-style-walk` command with new args:
+  - `--emit-video`
+  - `--video-fps`
+  - `--analyze-every-n`
+
+### How to run it
+
+Use:
+
+`python scripts/ost_orchestrator.py maverick-style-walk --project-id TP-0001 --monitor-index 1 --duration-seconds 120 --interval-seconds 0.8 --emit-video --video-fps 6 --analyze-every-n 1`
+
+### Output you’ll get
+
+Inside `output/ost-training-lab/style_walks/<session>/`:
+
+- `style_walk_capture.mp4` (video replay)
+- `frame_analysis.json` (frame-by-frame learning data)
+- `events.jsonl`
+- `summary.json`
+- `summary.md`
+- `screens/` (raw frame images)
+
+If you want, I can run one capture session now and then summarize the exact frames where `ceiling`/`gwb` quantity signatures appear so we can feed those into the condition-lock teacher step.
