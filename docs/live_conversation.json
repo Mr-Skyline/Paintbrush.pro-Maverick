@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-04-03T12:55:35.922689",
+  "updated_at": "2026-04-03T12:58:08.019975",
   "source": "C:\\Users\\travi\\.cursor\\projects\\c-Users-travi-OneDrive-Documents-Paintbrush-pro\\agent-transcripts\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl",
-  "message_count": 1127,
+  "message_count": 1128,
   "messages": [
     {
       "role": "user",
@@ -4510,6 +4510,10 @@
     {
       "role": "assistant",
       "text": "Proceeding \u2014 I\u2019m improving condition-name OCR in the selector now so it prioritizes **qty>0 rows first**, then performs stronger name extraction (including targeted GLM assist when needed) to lock `ceiling`/`gwb` by name. After patching, I\u2019ll run one training round and stop for your review."
+    },
+    {
+      "role": "assistant",
+      "text": "Proceed complete.\n\nI enforced your rule and ran the next round with improved name OCR, but it still correctly hard-stopped because it could not prove `ceiling` or `gwb` by name:\n\n- Boost: `success`\n- Copy: `blocked`\n- Reason: `boost_condition_not_locked_to_ceiling_or_gwb`\n- `selected_condition_keyword: \"\"`\n- `expected_condition_row_index: -1`\n- Artifact: `output/ost-training-lab/boost_then_copy_attempt_TP-0001_20260403_125747.json`\n\nSo behavior is now safe and aligned with your requirement (no wrong-condition execution).\n\n### Next high-impact fix (recommended)\nUse a dedicated **conditions-sidebar crop + GLM name extraction** pass before any click, then click by detected row index only when name is exactly `ceiling` or `gwb`.\n\nIf you approve, I\u2019ll implement that next."
     }
   ]
 }
