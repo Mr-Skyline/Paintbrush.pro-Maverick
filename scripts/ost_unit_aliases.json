@@ -1,0 +1,12 @@
+{
+  "unit-a": ["unit a", "type a", "a plan", "u a"],
+  "unit-a1": ["unit a1", "type a1", "a1"],
+  "unit-a2": ["unit a2", "type a2", "a2"],
+  "unit-b": ["unit b", "type b", "b plan", "u b"],
+  "unit-b1": ["unit b1", "type b1", "b1"],
+  "unit-b2": ["unit b2", "type b2", "b2"],
+  "unit-c": ["unit c", "type c", "c plan", "u c"],
+  "unit-c1": ["unit c1", "type c1", "c1"],
+  "unit-c2": ["unit c2", "type c2", "c2"],
+  "unit-d": ["unit d", "type d", "d plan", "u d"]
+}

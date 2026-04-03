@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "database_name": "OST_TRAINING.mdb",
+  "projects": [
+    {
+      "training_project_id": "TP-0001",
+      "project_name": "Training Project 01",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "source_project_folder": "",
+      "discovery_root_folder": "G:\\Shared drives\\SKYLINE 2026\\AI Bids",
+      "project_aliases": [
+        "10th and Sheridan"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0002",
+      "project_name": "Training Project 02",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0003",
+      "project_name": "Training Project 03",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0004",
+      "project_name": "Training Project 04",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0005",
+      "project_name": "Training Project 05",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0006",
+      "project_name": "Training Project 06",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0007",
+      "project_name": "Training Project 07",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0008",
+      "project_name": "Training Project 08",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0009",
+      "project_name": "Training Project 09",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0010",
+      "project_name": "Training Project 10",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0011",
+      "project_name": "Training Project 11",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0012",
+      "project_name": "Training Project 12",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0013",
+      "project_name": "Training Project 13",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0014",
+      "project_name": "Training Project 14",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0015",
+      "project_name": "Training Project 15",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0016",
+      "project_name": "Training Project 16",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0017",
+      "project_name": "Training Project 17",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0018",
+      "project_name": "Training Project 18",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0019",
+      "project_name": "Training Project 19",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0020",
+      "project_name": "Training Project 20",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    },
+    {
+      "training_project_id": "TP-0021",
+      "project_name": "Training Project 21",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1",
+        "T06-boost-open-run-verify-L2"
+      ],
+      "notes": ""
+    }
+  ]
+}

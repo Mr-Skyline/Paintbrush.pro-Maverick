@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "profile": "primary-ost-monitor",
+  "description": "Anchor atlas for local OST black-box automation",
+  "window_title_contains": "On-Screen Takeoff",
+  "monitor": {
+    "index": 1,
+    "expected_width": 1920,
+    "expected_height": 1080
+  },
+  "anchors": {
+    "boost_button": {
+      "x": 3624,
+      "y": 282
+    },
+    "boost_run_button": {
+      "x": 3134,
+      "y": 996
+    },
+    "boost_close_button": {
+      "x": 3196,
+      "y": 343
+    }
+  },
+  "relative_regions": {
+    "boost_dialog_run_zone": {
+      "description": "Lower-right area in Boost dialog where Run button is expected",
+      "x_ratio_min": 0.5,
+      "y_ratio_min": 0.55
+    }
+  },
+  "verification": {
+    "require_scale_warning_absent": true,
+    "open_change_threshold": 1.2,
+    "run_change_threshold": 0.35,
+    "run_full_change_threshold": 0.08
+  },
+  "notes": [
+    "Coordinates are global desktop coordinates.",
+    "Keep monitor layout and OST window placement stable.",
+    "Use ost_ui_mapper.py to update anchors quickly."
+  ],
+  "updated_at": "2026-04-02T17:02:01.588628"
+}

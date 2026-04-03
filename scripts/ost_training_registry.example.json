@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "database_name": "OST_TRAINING.mdb",
+  "projects": [
+    {
+      "training_project_id": "TP-0001",
+      "project_name": "Residence Inn - Unit Stack A",
+      "source_type": "completed_real_project_copy",
+      "module_targets": [
+        "T01-linear-baseline-L1",
+        "T02-area-baseline-L1",
+        "T03-count-baseline-L1"
+      ],
+      "notes": "Starter onboarding sample"
+    }
+  ]
+}

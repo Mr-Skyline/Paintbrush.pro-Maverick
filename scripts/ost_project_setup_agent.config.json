@@ -1,0 +1,160 @@
+{
+  "enabled": true,
+  "window_title_contains": "On-Screen Takeoff",
+  "monitor_index": 1,
+  "click_delay_ms": 350,
+  "typing_interval_ms": 10,
+  "use_ui_atlas": true,
+  "ui_atlas_path": "scripts/ost_ui_atlas.json",
+  "adaptive_retries": {
+    "enabled": true,
+    "click_anchor_retries": 2
+  },
+  "maverick_logging": {
+    "enabled": true,
+    "runtime_config_path": "scripts/maverick_runtime.config.json",
+    "project_id": ""
+  },
+  "anchors": {
+    "training_playground_first_project": {
+      "x": 2211,
+      "y": 487
+    },
+    "file_menu": {
+      "x": 1946,
+      "y": 200
+    },
+    "new_project_menu_item": {
+      "x": 2240,
+      "y": 223
+    },
+    "project_name_input": {
+      "x": 2596,
+      "y": 450
+    },
+    "project_path_input": {
+      "x": 2574,
+      "y": 936
+    },
+    "project_pdf_input": {
+      "x": 2800,
+      "y": 566
+    },
+    "project_ok_button": {
+      "x": 3202,
+      "y": 430
+    },
+    "conditions_first_row": {
+      "x": 2035,
+      "y": 424
+    },
+    "conditions_second_row": {
+      "x": 2109,
+      "y": 596
+    },
+    "area_dropdown": {
+      "x": 189,
+      "y": 443
+    },
+    "page_next_button": {
+      "x": 2176,
+      "y": 276
+    }
+  },
+  "steps": [
+    {
+      "type": "click_anchor",
+      "anchor": "training_playground_first_project",
+      "label": "Select first project under Training Playground"
+    },
+    {
+      "type": "sleep_ms",
+      "ms": 450,
+      "label": "Wait for project selection"
+    },
+    {
+      "type": "click_anchor",
+      "anchor": "file_menu",
+      "label": "Open File menu"
+    },
+    {
+      "type": "click_anchor",
+      "anchor": "new_project_menu_item",
+      "label": "Select New Project"
+    },
+    {
+      "type": "sleep_ms",
+      "ms": 700,
+      "label": "Wait for dialog"
+    },
+    {
+      "type": "click_anchor",
+      "anchor": "project_name_input",
+      "label": "Focus project name"
+    },
+    {
+      "type": "hotkey",
+      "keys": [
+        "ctrl",
+        "a"
+      ],
+      "label": "Select existing name"
+    },
+    {
+      "type": "type_text",
+      "text": "{{project_name}}",
+      "label": "Enter project name"
+    },
+    {
+      "type": "click_anchor",
+      "anchor": "project_path_input",
+      "label": "Focus project path"
+    },
+    {
+      "type": "hotkey",
+      "keys": [
+        "ctrl",
+        "a"
+      ],
+      "label": "Select existing path"
+    },
+    {
+      "type": "type_text",
+      "text": "{{project_dir}}",
+      "label": "Enter project path"
+    },
+    {
+      "type": "click_anchor",
+      "anchor": "project_pdf_input",
+      "label": "Focus plan pdf path"
+    },
+    {
+      "type": "hotkey",
+      "keys": [
+        "ctrl",
+        "a"
+      ],
+      "label": "Select existing pdf path"
+    },
+    {
+      "type": "type_text",
+      "text": "{{takeoff_plans_first_file}}",
+      "label": "Enter plan pdf path"
+    },
+    {
+      "type": "screenshot",
+      "tag": "before_ok",
+      "label": "Capture dialog before submit"
+    },
+    {
+      "type": "click_anchor",
+      "anchor": "project_ok_button",
+      "label": "Confirm project setup"
+    },
+    {
+      "type": "sleep_ms",
+      "ms": 1800,
+      "label": "Wait for project load"
+    }
+  ]
+}

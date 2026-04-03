@@ -1,0 +1,20 @@
+[
+  {
+    "sku": "LMBR-2X4X8",
+    "name": "Lumber 2x4x8",
+    "unitPrice": 4.99,
+    "aliases": ["2x4x8 lumber", "stud 2x4 8"]
+  },
+  {
+    "sku": "PLY-3/4-BC",
+    "name": "Plywood 3/4 BC",
+    "unitPrice": 52.35,
+    "aliases": ["3/4 bc plywood"]
+  },
+  {
+    "sku": "SCREW-3IN-1LB",
+    "name": "Construction Screw 3in 1lb",
+    "unitPrice": 10.49,
+    "aliases": ["3in construction screw", "construction screw 1lb"]
+  }
+]

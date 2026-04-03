@@ -1,0 +1,48 @@
+{
+  "agent_name": "Maverick",
+  "output_root": "output/maverick",
+  "lock_file": "output/maverick/runtime.lock",
+  "runtime": {
+    "heartbeat_seconds": 4,
+    "stability_window_seconds": 8,
+    "boot_retry_limit": 3,
+    "restart_backoff_seconds": 3,
+    "coach_failure_threshold": 10
+  },
+  "quality": {
+    "exclude_project_name_patterns": [
+      "backup",
+      "archive"
+    ]
+  },
+  "update_policy": "suggest-only",
+  "dependencies": [
+    {
+      "id": "training_db_monitor",
+      "enabled": true,
+      "startup_delay_seconds": 1,
+      "ready_timeout_seconds": 10,
+      "command": [
+        "{python}",
+        "scripts/monitor_ost_training_db.py",
+        "--file",
+        "C:\\OCS Documents\\OST\\Training Playground.mdb",
+        "--log",
+        "output/maverick/training_db_monitor.jsonl"
+      ]
+    },
+    {
+      "id": "intake_watch",
+      "enabled": true,
+      "startup_delay_seconds": 2,
+      "ready_timeout_seconds": 12,
+      "command": [
+        "{python}",
+        "scripts/ost_project_intake.py",
+        "--config",
+        "scripts/ost_project_intake.config.json",
+        "--watch"
+      ]
+    }
+  ]
+}

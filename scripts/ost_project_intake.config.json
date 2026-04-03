@@ -1,0 +1,29 @@
+{
+  "allowed_roots": [
+    "G:\\Shared drives\\SKYLINE 2026\\AI Bids"
+  ],
+  "watch_root": "G:\\Shared drives\\SKYLINE 2026\\AI Bids",
+  "poll_seconds": 15,
+  "auto_apply": true,
+  "max_project_depth": 2,
+  "min_idle_seconds_before_process": 20,
+  "organization_folder": "_organized",
+  "reports_folder": "_reports",
+  "processed_state_path": "output/ost-project-intake/state.json",
+  "retry_queue_path": "output/ost-project-intake/retry_queue.json",
+  "retry_min_interval_seconds": 300,
+  "retry_backoff_seconds": 300,
+  "retry_max_interval_seconds": 3600,
+  "scope_intel_max_files": 60,
+  "scope_intel_max_pdf_pages": 40,
+  "scope_profile_max_pages": 60,
+  "scope_intel_timeout_seconds": 90,
+  "scope_profile_timeout_seconds": 90,
+  "ost_setup_timeout_seconds": 90,
+  "max_moves_per_run": 120,
+  "ost_setup": {
+    "enabled": true,
+    "config_path": "scripts/ost_project_setup_agent.config.json",
+    "script_path": "scripts/ost_project_setup_agent.py"
+  }
+}

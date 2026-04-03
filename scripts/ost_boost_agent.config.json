@@ -1,0 +1,68 @@
+{
+  "strict_four_step": true,
+  "use_ui_atlas": true,
+  "ui_atlas_path": "scripts/ost_ui_atlas.json",
+  "tesseract_cmd": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
+  "window_title_contains": "On-Screen Takeoff",
+  "monitor_index": 1,
+  "click_delay_ms": 450,
+  "post_boost_open_wait_ms": 1200,
+  "post_boost_ready_wait_ms": 5000,
+  "ready_poll_ms": 500,
+  "post_boost_run_wait_ms": 3500,
+  "run_observe_total_ms": 18000,
+  "run_observe_poll_ms": 1500,
+  "max_open_retries": 2,
+  "max_run_retries": 2,
+  "run_click_strategy": "auto",
+  "adaptive_retries": {
+    "enabled": true,
+    "max_open_retries_cap": 4,
+    "max_run_retries_cap": 5,
+    "scale_per_failures": 5
+  },
+  "require_scale_warning_absent": false,
+  "anchors": {
+    "boost_button": {
+      "x": 3631,
+      "y": 279
+    },
+    "boost_run_button": {
+      "x": 3138,
+      "y": 996
+    },
+    "boost_close_button": {
+      "x": 3179,
+      "y": 256
+    }
+  },
+  "boost_option_clicks": [],
+  "auto_scale_preflight": {
+    "enabled": false,
+    "max_cycles": 1,
+    "scale_clicks": []
+  },
+  "vision_checks": {
+    "enabled": true,
+    "open_change_threshold": 1.2,
+    "run_change_threshold": 0.35,
+    "run_full_change_threshold": 0.08,
+    "open_black_frame_max_ratio": 0.85,
+    "run_roi_half_width": 360,
+    "run_roi_half_height": 220
+  },
+  "ocr_checks": {
+    "enabled": true,
+    "expected_any_after_run": [
+      "boost",
+      "finding",
+      "review",
+      "condition"
+    ]
+  },
+  "maverick_logging": {
+    "enabled": true,
+    "runtime_config_path": "scripts/maverick_runtime.config.json",
+    "project_id": "TP-0001"
+  }
+}

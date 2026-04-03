@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "program_name": "OST Agent Training Playground",
+  "database_name": "OST_TRAINING.mdb",
+  "track": "boost-first-ui-agent",
+  "module_naming": {
+    "format": "T##-<skill>-L#",
+    "example": "T04-multi-condition-L2",
+    "rules": [
+      "T## is a stable numeric module id.",
+      "<skill> is kebab-case capability label.",
+      "L# is difficulty level where L1 is easiest."
+    ]
+  },
+  "score_scale": {
+    "pass_min": 85,
+    "excellent_min": 95,
+    "weights": {
+      "step_completion": 40,
+      "quantity_accuracy": 35,
+      "recovery_behavior": 15,
+      "runtime_stability": 10
+    }
+  },
+  "initial_modules": [
+    {
+      "id": "T01-linear-baseline-L1",
+      "goal": "Draw one linear condition end-to-end with stable completion.",
+      "core_skills": ["open project", "select condition", "linear trace", "verify qty"],
+      "expected_outputs": ["line markups", "qty update in condition tree"],
+      "pass_criteria": ["step completion >= 100%", "qty error <= 2%"]
+    },
+    {
+      "id": "T02-area-baseline-L1",
+      "goal": "Create one closed area condition and verify area quantity.",
+      "core_skills": ["select area tool", "close polygon", "verify qty"],
+      "expected_outputs": ["filled area markup", "qty update"],
+      "pass_criteria": ["no orphaned area", "qty error <= 2%"]
+    },
+    {
+      "id": "T03-count-baseline-L1",
+      "goal": "Execute count takeoff with target symbols.",
+      "core_skills": ["select count condition", "place count points", "verify count"],
+      "expected_outputs": ["count marks", "count qty update"],
+      "pass_criteria": ["count variance <= 1 item"]
+    },
+    {
+      "id": "T04-multi-condition-room-L2",
+      "goal": "Run linear + area + count in one room without context loss.",
+      "core_skills": ["condition switching", "mixed takeoff", "state persistence"],
+      "expected_outputs": ["three condition updates"],
+      "pass_criteria": ["all three conditions updated", "no cross-condition contamination"]
+    },
+    {
+      "id": "T05-scale-check-gate-L2",
+      "goal": "Detect invalid scale warning and recover before continuing.",
+      "core_skills": ["preflight check", "scale correction", "retry"],
+      "expected_outputs": ["warning handled", "successful rerun"],
+      "pass_criteria": ["warning not present before final run"]
+    },
+    {
+      "id": "T06-boost-open-run-verify-L2",
+      "goal": "Complete strict 4-step Boost sequence with proof artifacts.",
+      "core_skills": ["boost open", "options stage", "run", "verify"],
+      "expected_outputs": ["run_log.json", "before/open/after screenshots"],
+      "pass_criteria": ["step1-4 all true", "failed_step is null"]
+    },
+    {
+      "id": "T07-boost-option-presets-L2",
+      "goal": "Apply deterministic Boost option presets then run.",
+      "core_skills": ["preset clicks", "option consistency", "run validation"],
+      "expected_outputs": ["option click audit", "stable run result"],
+      "pass_criteria": ["preset click sequence completed", "run verified"]
+    },
+    {
+      "id": "T08-page-navigation-resume-L3",
+      "goal": "Navigate between pages and resume task without losing context.",
+      "core_skills": ["page switch", "context restore", "continued takeoff"],
+      "expected_outputs": ["correct page targeting", "continued quantity updates"],
+      "pass_criteria": ["no actions on wrong page"]
+    },
+    {
+      "id": "T09-recovery-after-misclick-L3",
+      "goal": "Recover from forced misclick and complete scenario.",
+      "core_skills": ["error detection", "undo/backtrack", "re-execution"],
+      "expected_outputs": ["recovery action log", "final successful completion"],
+      "pass_criteria": ["recovery path invoked", "task finished within retry budget"]
+    },
+    {
+      "id": "T10-complex-unit-repeat-L3",
+      "goal": "Apply multi-condition workflow across repeated unit plans.",
+      "core_skills": ["repeatability", "consistency", "batch-style execution"],
+      "expected_outputs": ["consistent condition totals across units"],
+      "pass_criteria": ["variance across repeated units <= 3%"]
+    }
+  ],
+  "promotion_policy": {
+    "to_L2": "Pass all L1 modules twice consecutively.",
+    "to_L3": "Average score >= 90 across L2 modules.",
+    "production_ready": "Score >= 95 on T06-T10 in two consecutive runs."
+  }
+}

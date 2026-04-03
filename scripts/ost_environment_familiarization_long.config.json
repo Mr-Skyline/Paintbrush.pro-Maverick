@@ -1,0 +1,94 @@
+{
+  "enabled": true,
+  "window_title_contains": "On-Screen Takeoff",
+  "monitor_index": 1,
+  "click_delay_ms": 450,
+  "typing_interval_ms": 10,
+  "use_ui_atlas": false,
+  "adaptive_retries": {
+    "enabled": true,
+    "click_anchor_retries": 1
+  },
+  "maverick_logging": {
+    "enabled": true,
+    "runtime_config_path": "scripts/maverick_runtime.config.json",
+    "project_id": "TP-0001"
+  },
+  "anchors": {
+    "conditions_first_row": {
+      "x": 2035,
+      "y": 424
+    },
+    "conditions_second_row": {
+      "x": 2109,
+      "y": 596
+    },
+    "area_dropdown": {
+      "x": 189,
+      "y": 443
+    },
+    "page_next_button": {
+      "x": 2176,
+      "y": 276
+    }
+  },
+  "steps": [
+    { "type": "screenshot", "tag": "start", "label": "Capture start state" },
+    { "type": "click_anchor", "anchor": "conditions_first_row", "label": "Select condition row 1" },
+    { "type": "sleep_ms", "ms": 600, "label": "Observe row 1 highlights" },
+    { "type": "click_anchor", "anchor": "area_dropdown", "label": "Open area dropdown" },
+    { "type": "press", "key": "down", "label": "Area next option" },
+    { "type": "press", "key": "enter", "label": "Apply area option" },
+    { "type": "sleep_ms", "ms": 900, "label": "Wait for area update" },
+    { "type": "screenshot", "tag": "after_area_change_1", "label": "Capture first area change" },
+
+    { "type": "click_anchor", "anchor": "page_next_button", "label": "Next page 1" },
+    { "type": "sleep_ms", "ms": 1000, "label": "Render page 1" },
+    { "type": "click_anchor", "anchor": "conditions_second_row", "label": "Select condition row 2" },
+    { "type": "sleep_ms", "ms": 650, "label": "Observe row 2 on page 1" },
+
+    { "type": "click_anchor", "anchor": "page_next_button", "label": "Next page 2" },
+    { "type": "sleep_ms", "ms": 1000, "label": "Render page 2" },
+    { "type": "click_anchor", "anchor": "conditions_first_row", "label": "Select condition row 1" },
+    { "type": "sleep_ms", "ms": 650, "label": "Observe row 1 on page 2" },
+
+    { "type": "click_anchor", "anchor": "page_next_button", "label": "Next page 3" },
+    { "type": "sleep_ms", "ms": 1000, "label": "Render page 3" },
+    { "type": "click_anchor", "anchor": "conditions_second_row", "label": "Select condition row 2" },
+    { "type": "sleep_ms", "ms": 650, "label": "Observe row 2 on page 3" },
+    { "type": "screenshot", "tag": "after_page_3", "label": "Capture page 3 state" },
+
+    { "type": "click_anchor", "anchor": "page_next_button", "label": "Next page 4" },
+    { "type": "sleep_ms", "ms": 1100, "label": "Render page 4" },
+    { "type": "click_anchor", "anchor": "conditions_first_row", "label": "Select condition row 1" },
+    { "type": "sleep_ms", "ms": 650, "label": "Observe row 1 on page 4" },
+
+    { "type": "click_anchor", "anchor": "page_next_button", "label": "Next page 5" },
+    { "type": "sleep_ms", "ms": 1100, "label": "Render page 5" },
+    { "type": "click_anchor", "anchor": "conditions_second_row", "label": "Select condition row 2" },
+    { "type": "sleep_ms", "ms": 650, "label": "Observe row 2 on page 5" },
+
+    { "type": "click_anchor", "anchor": "page_next_button", "label": "Next page 6" },
+    { "type": "sleep_ms", "ms": 1100, "label": "Render page 6" },
+    { "type": "click_anchor", "anchor": "conditions_first_row", "label": "Select condition row 1" },
+    { "type": "sleep_ms", "ms": 700, "label": "Observe row 1 on page 6" },
+    { "type": "screenshot", "tag": "after_page_6", "label": "Capture page 6 state" },
+
+    { "type": "click_anchor", "anchor": "area_dropdown", "label": "Open area dropdown again" },
+    { "type": "press", "key": "down", "label": "Area next option again" },
+    { "type": "press", "key": "enter", "label": "Apply area option again" },
+    { "type": "sleep_ms", "ms": 1000, "label": "Wait for area update again" },
+
+    { "type": "click_anchor", "anchor": "page_next_button", "label": "Next page 7" },
+    { "type": "sleep_ms", "ms": 1100, "label": "Render page 7" },
+    { "type": "click_anchor", "anchor": "conditions_second_row", "label": "Select condition row 2" },
+    { "type": "sleep_ms", "ms": 700, "label": "Observe row 2 on page 7" },
+
+    { "type": "click_anchor", "anchor": "page_next_button", "label": "Next page 8" },
+    { "type": "sleep_ms", "ms": 1200, "label": "Render page 8" },
+    { "type": "click_anchor", "anchor": "conditions_first_row", "label": "Select condition row 1" },
+    { "type": "sleep_ms", "ms": 750, "label": "Observe row 1 on page 8" },
+
+    { "type": "screenshot", "tag": "end", "label": "Capture final state" }
+  ]
+}
