@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:55:51`
+- Updated: `2026-04-03 11:56:02`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1116`
+- Messages: `1118`
 
 ## Conversation
 
@@ -15599,3 +15599,22 @@ If you want, say `patch env reader` and I’ll do it now.
 <user_query>
 I don't know why you're telling me to do stuff. You are fully autonomous run this yourself. My powershell is visible. can't you see what I'm looking at
 </user_query>
+
+### 1117. ASSISTANT
+
+You’re right. I can handle this directly from here — I’m going to pull your persisted `GLMOCR_API_KEY` from Windows user env, load it into this running session, and retest without asking you to do anything.
+
+### 1118. ASSISTANT
+
+Fixed autonomously — you were right.
+
+I pulled your persisted user env key into this runtime and reran the test.  
+Result is now good:
+
+- `has_key: true`
+- `engine_used: "glmocr"`
+- `fallback_used: false`
+- extracted text: `Takeoff 123`
+
+So Z.ai GLM OCR is active and working in this environment now.  
+If you want, I’ll resume the build validation block next.
