@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 15:27:29`
+- Updated: `2026-04-03 15:38:12`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1236`
+- Messages: `1239`
 
 ## Conversation
 
@@ -16421,3 +16421,100 @@ To-do's from the plan have already been created. Do not create them again. Mark 
 ### 1236. ASSISTANT
 
 I’m implementing this now in order, starting by hardening strict no-Boost area mode (`ceiling`/`gwb` only + mandatory style read), then I’ll move through OCR pre-read, polygon planner, telemetry loop, and QA gates.
+
+### 1237. ASSISTANT
+
+I’m now implementing the core no-Boost area logic in `ost_left_blank_takeoff_attempt.py`: strict condition/style gates, GLM pre-read, and contour-based polygon planning with speed-aware fallback.
+
+### 1238. ASSISTANT
+
+I’m wiring a dedicated no-Boost command path now (`area-only`, `ceiling/gwb` restricted) so you can run this mode directly without touching Boost commands.
+
+### 1239. ASSISTANT
+
+Implemented exactly to the attached no-Boost plan, without editing the plan file, and completed all existing to-dos in order.
+
+No-Boost mode is now a first-class path: GLM-OCR pre-read + strict area-style enforcement + `ceiling/gwb` condition restriction + contour-driven polygon planning + balanced speed/accuracy telemetry + QA gates.
+
+## What I changed
+
+- Added strict no-Boost commands:
+  - `scripts/ost_training_lab.py`
+    - `no-boost-area-attempt`
+    - `no-boost-area-batch`
+  - `scripts/ost_orchestrator.py`
+    - `no-boost-area-attempt`
+    - `no-boost-area-batch`
+
+- Hardened area-only, condition-restricted execution:
+  - `scripts/ost_left_blank_takeoff_attempt.py`
+    - New flags:
+      - `--enforce-area-style`
+      - `--enforce-condition-names` (default `ceiling,gwb`)
+      - `--ocr-config`
+      - `--balanced-latency-budget-ms`
+    - Fails early if:
+      - style inspection does not return `area` when enforced
+      - selected condition name is not in allowed set
+
+- Implemented OCR-first pre-read stage (GLM path via shared OCR engine):
+  - `scripts/ost_left_blank_takeoff_attempt.py`
+    - Added `_run_glm_plan_preread(...)`
+    - Uses `ocr_engine` with ROI extracted from active canvas
+    - Produces cue hits, confidence, engine/fallback usage, OCR duration
+
+- Upgraded area polygon planner:
+  - `scripts/ost_left_blank_takeoff_attempt.py`
+    - Added `_plan_area_polygon_v2(...)`
+    - Contour extraction + polygon approximation
+    - Clockwise/winding normalization
+    - 90-degree corner start preference
+    - Falls back to deterministic rectangle strategy when needed
+
+- Added balanced speed/accuracy control telemetry:
+  - `scripts/ost_left_blank_takeoff_attempt.py`
+    - Phase timeline now includes `elapsed_ms` and `delta_ms`
+    - Added `runtime_ms`
+    - Added balanced policy block (`latency_budget_ms`, conservative mode)
+    - Conservative fallback engages when runtime exceeds budget
+
+- Extended training summaries and score components:
+  - `scripts/ost_training_lab.py`
+    - Passes new strict mode flags through `run_takeoff_copy_attempt(...)`
+    - Adds score components:
+      - `area_style_correctness`
+      - `condition_name_correctness`
+      - `runtime_latency_ms`
+    - Batch summary adds:
+      - `runtime_ms_avg`
+      - `ocr_preread_ms_avg`
+      - `conservative_mode_rate`
+
+- Extended QA gates and rollout signals:
+  - `scripts/maverick_runtime.py`
+    - New metrics/status:
+      - `area_style_correctness_rate`
+      - `condition_name_correctness_rate`
+      - `runtime_latency_ms` + `runtime_latency_band`
+    - Added thresholds and rollout checks for area style, condition-name correctness, latency
+    - Quality gate summary now reports these explicitly
+
+## Validation completed
+
+- `py_compile` passed for:
+  - `scripts/ost_left_blank_takeoff_attempt.py`
+  - `scripts/ost_training_lab.py`
+  - `scripts/ost_orchestrator.py`
+  - `scripts/maverick_runtime.py`
+- Lint check: no errors.
+- CLI help confirms new no-Boost commands in both orchestrator and training lab.
+
+## New commands to use now
+
+- Single strict no-Boost area attempt:
+  - `python scripts/ost_orchestrator.py no-boost-area-attempt --project-id TP-0001 --condition-row first --monitor-index 1`
+
+- Strict no-Boost area batch:
+  - `python scripts/ost_orchestrator.py no-boost-area-batch --project-id TP-0001 --attempts 10 --monitor-index 1`
+
+If you want, I’ll start the no-Boost area batch now and report the first performance/accuracy gate readout.
