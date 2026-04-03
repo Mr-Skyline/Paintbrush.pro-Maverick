@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:19:03`
+- Updated: `2026-04-03 14:29:46`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1194`
+- Messages: `1200`
 
 ## Conversation
 
@@ -16012,3 +16012,35 @@ Please proceed
 ### 1194. ASSISTANT
 
 Proceeding with autonomous training now using the updated condition contract (Boost discovery by qty, copy by locked name/row). I’ll launch a fresh continuous run and report the first checkpoint summary.
+
+### 1195. ASSISTANT
+
+Update: the trainer is still being blocked by a live mutex owner (`pid 9916`), so all attempts are getting rejected before they start. I’m clearing that owner now and immediately relaunching so the autonomous loop can actually execute attempts.
+
+### 1196. ASSISTANT
+
+The loop is actively running now (not mutex-failing), but it hasn’t emitted the first checkpoint yet — likely still inside the first full Boost->copy cycle. I’m continuing to monitor until we get the first summary block.
+
+### 1197. ASSISTANT
+
+I found the issue with visibility: summaries only print every 5 attempts, and each attempt can take several minutes, so it looks idle. I’m restarting it with `summary-every=1` so you get live per-attempt feedback.
+
+### 1198. ASSISTANT
+
+I traced the remaining issue: overlapping trainer processes are contending for the same Boost mutex. I’m clearing the current lock-owner process and restarting a single clean autonomous run so attempts can execute instead of immediately failing lock checks.
+
+### 1199. ASSISTANT
+
+Training is now running a clean single loop with no lock contention; it’s still inside attempt 1 (this path doesn’t print until an attempt completes). I’m continuing to monitor and will post the first per-attempt summary as soon as it emits.
+
+### 1200. ASSISTANT
+
+Autonomous training is still running in a clean single-process loop right now.
+
+Important note: this command buffers output, so you won’t see per-attempt logs until the process flushes/finishes a block. That’s why it appears quiet even though it’s executing.
+
+I’ll keep it running and continue monitoring; as soon as the first block summary is written, I’ll report:
+- attempts completed
+- lock success/failure reasons
+- condition-match status (`ceiling`/`gwb` + row lock)
+- geometry pass/fail reasons
