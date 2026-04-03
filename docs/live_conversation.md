@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:57:18`
+- Updated: `2026-04-03 11:57:37`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1122`
+- Messages: `1123`
 
 ## Conversation
 
@@ -15638,3 +15638,9 @@ You might have to do that again I was in control of the mouse
 ### 1122. ASSISTANT
 
 Got it — I’ll restart the validation run clean so your manual control doesn’t contaminate results. I’m stopping the current block and rerunning from attempt 1.
+
+### 1123. ASSISTANT
+
+Done — I killed the in-progress run and restarted a clean 10-attempt block from scratch.
+
+I’ll use this restarted run as the valid baseline before continuing to the 20-attempt block.
