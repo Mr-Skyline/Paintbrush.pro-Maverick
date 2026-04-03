@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 16:55:54`
+- Updated: `2026-04-03 16:57:18`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1270`
+- Messages: `1271`
 
 ## Conversation
 
@@ -16698,3 +16698,20 @@ The area that the agent was trying to work in on that last go around was the wro
 ### 1270. ASSISTANT
 
 Makes sense — I’ll harden the click pipeline so every action is clamped/validated against the active OST window bounds before it can execute, then I’ll run a quick dry check.
+
+### 1271. ASSISTANT
+
+Done — I hardened it so the agent stays inside the OST window.
+
+What I changed in `scripts/ost_left_blank_takeoff_attempt.py`:
+- Added active OST window rect detection (`get_window_rect(...)`) after focus.
+- Added a click safety clamp (`_clamp_point_to_ost_window(...)`) that bounds every click to the focused OST window.
+- Updated `click_xy(...)` so all drawing/click actions now use the clamped coordinates.
+- If a point gets corrected, it logs:
+  - `ost_window_clamp from=(x,y) to=(x,y)`
+
+Result:
+- Even if target planning drifts, the actual click cannot go outside the OST window bounds.
+- This directly prevents the “working in the wrong area” behavior from the last run.
+
+If you want, I can apply the same hard clamp to the other automation scripts too (`ost_boost_agent.py`, `ost_condition_takeoff_attempt.py`, etc.) so this is enforced everywhere, not just this flow.
