@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 13:24:53`
+- Updated: `2026-04-03 13:28:40`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1160`
+- Messages: `1162`
 
 ## Conversation
 
@@ -15697,3 +15697,34 @@ OK but what are you capturing because the agent isn't doing anything
 ### 1160. ASSISTANT
 
 You’re right to call that out — this run is a **passive observer** capture (screen/video only), not a click/automation run. I’m checking the live output right now to confirm whether it’s actively capturing frames or if it’s stalled on window focus.
+
+### 1161. ASSISTANT
+
+Current run is only recording the screen every ~0.8s and writing video/frames; it does **not** move the mouse or run takeoff actions by itself. I’m stopping this passive run and launching an **active sequence**: start capture, then run Boost->Analyze->Erase->Copy during capture so the video contains real agent actions.
+
+### 1162. ASSISTANT
+
+You were absolutely right to challenge it.
+
+What I just captured was:
+
+- A **full 180s video** of OST during an **active Boost->Copy attempt** (not passive only).
+- A **frame-by-frame analysis JSON** for every sampled frame.
+- The active run log from the Boost attempt.
+
+Artifacts:
+
+- Video: `output/ost-training-lab/style_walks/stylewalk-20260403_132509/style_walk_capture.mp4`
+- Frame analysis: `output/ost-training-lab/style_walks/stylewalk-20260403_132509/frame_analysis.json`
+- Attempt summary: `output/ost-training-lab/boost_then_copy_attempt_TP-0001_20260403_132622.json`
+
+Result from this active run:
+
+- Boost ran, but condition lock still failed:
+  - `reason: boost_condition_not_locked_to_ceiling_or_gwb`
+  - `selected_condition_keyword: ""`
+  - `expected_condition_row_index: -1`
+
+Also important: the frame analysis had **no `ceiling`/`gwb` hits**, which confirms OCR isn’t reliably reading the conditions pane in this capture.
+
+Next fix I should do: add a **dedicated conditions-sidebar crop analyzer** (high-contrast + larger scale + row OCR) so video/frame analysis can reliably detect `ceiling`/`gwb` with qty>0 before we proceed to copy.
