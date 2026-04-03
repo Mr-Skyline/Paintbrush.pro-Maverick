@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-04-03T15:38:12.642799",
+  "updated_at": "2026-04-03T15:38:37.288266",
   "source": "C:\\Users\\travi\\.cursor\\projects\\c-Users-travi-OneDrive-Documents-Paintbrush-pro\\agent-transcripts\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl",
-  "message_count": 1239,
+  "message_count": 1253,
   "messages": [
     {
       "role": "user",
@@ -4958,6 +4958,62 @@
     {
       "role": "assistant",
       "text": "Implemented exactly to the attached no-Boost plan, without editing the plan file, and completed all existing to-dos in order.\n\nNo-Boost mode is now a first-class path: GLM-OCR pre-read + strict area-style enforcement + `ceiling/gwb` condition restriction + contour-driven polygon planning + balanced speed/accuracy telemetry + QA gates.\n\n## What I changed\n\n- Added strict no-Boost commands:\n  - `scripts/ost_training_lab.py`\n    - `no-boost-area-attempt`\n    - `no-boost-area-batch`\n  - `scripts/ost_orchestrator.py`\n    - `no-boost-area-attempt`\n    - `no-boost-area-batch`\n\n- Hardened area-only, condition-restricted execution:\n  - `scripts/ost_left_blank_takeoff_attempt.py`\n    - New flags:\n      - `--enforce-area-style`\n      - `--enforce-condition-names` (default `ceiling,gwb`)\n      - `--ocr-config`\n      - `--balanced-latency-budget-ms`\n    - Fails early if:\n      - style inspection does not return `area` when enforced\n      - selected condition name is not in allowed set\n\n- Implemented OCR-first pre-read stage (GLM path via shared OCR engine):\n  - `scripts/ost_left_blank_takeoff_attempt.py`\n    - Added `_run_glm_plan_preread(...)`\n    - Uses `ocr_engine` with ROI extracted from active canvas\n    - Produces cue hits, confidence, engine/fallback usage, OCR duration\n\n- Upgraded area polygon planner:\n  - `scripts/ost_left_blank_takeoff_attempt.py`\n    - Added `_plan_area_polygon_v2(...)`\n    - Contour extraction + polygon approximation\n    - Clockwise/winding normalization\n    - 90-degree corner start preference\n    - Falls back to deterministic rectangle strategy when needed\n\n- Added balanced speed/accuracy control telemetry:\n  - `scripts/ost_left_blank_takeoff_attempt.py`\n    - Phase timeline now includes `elapsed_ms` and `delta_ms`\n    - Added `runtime_ms`\n    - Added balanced policy block (`latency_budget_ms`, conservative mode)\n    - Conservative fallback engages when runtime exceeds budget\n\n- Extended training summaries and score components:\n  - `scripts/ost_training_lab.py`\n    - Passes new strict mode flags through `run_takeoff_copy_attempt(...)`\n    - Adds score components:\n      - `area_style_correctness`\n      - `condition_name_correctness`\n      - `runtime_latency_ms`\n    - Batch summary adds:\n      - `runtime_ms_avg`\n      - `ocr_preread_ms_avg`\n      - `conservative_mode_rate`\n\n- Extended QA gates and rollout signals:\n  - `scripts/maverick_runtime.py`\n    - New metrics/status:\n      - `area_style_correctness_rate`\n      - `condition_name_correctness_rate`\n      - `runtime_latency_ms` + `runtime_latency_band`\n    - Added thresholds and rollout checks for area style, condition-name correctness, latency\n    - Quality gate summary now reports these explicitly\n\n## Validation completed\n\n- `py_compile` passed for:\n  - `scripts/ost_left_blank_takeoff_attempt.py`\n  - `scripts/ost_training_lab.py`\n  - `scripts/ost_orchestrator.py`\n  - `scripts/maverick_runtime.py`\n- Lint check: no errors.\n- CLI help confirms new no-Boost commands in both orchestrator and training lab.\n\n## New commands to use now\n\n- Single strict no-Boost area attempt:\n  - `python scripts/ost_orchestrator.py no-boost-area-attempt --project-id TP-0001 --condition-row first --monitor-index 1`\n\n- Strict no-Boost area batch:\n  - `python scripts/ost_orchestrator.py no-boost-area-batch --project-id TP-0001 --attempts 10 --monitor-index 1`\n\nIf you want, I\u2019ll start the no-Boost area batch now and report the first performance/accuracy gate readout."
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nBefore you pro ceed can you provide timelines\n</user_query>"
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nImplement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself.\n\nTo-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos.\n</user_query>"
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nProceed, You are autonomous and turn off Anything that would block you\n</user_query>"
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nNo I don't want to do anymore boost training I want it to instead use It's brain and logic to evaluate the plans and of course GLMOCR. For it to figure out how read the plans and then use the conditions to perform the takeoffs. Let's come up with a plan to do this. I want a strategy that is going to be able to Make Accurate determinations quickly. \n</user_query>"
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nImplement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself.\n\nTo-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos.\n</user_query>"
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nBefore we proceed with anything else I want to pause for one hour\n</user_query>"
+    },
+    {
+      "role": "assistant",
+      "text": "Paused. I\u2019ll hold here.\n\nWhen you\u2019re ready (in about an hour), send `resume` and I\u2019ll continue from this exact no-Boost GLM plan state."
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nBefore you pro ceed can you provide timelines\n</user_query>"
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nImplement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself.\n\nTo-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos.\n</user_query>"
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nProceed, You are autonomous and turn off Anything that would block you\n</user_query>"
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nNo I don't want to do anymore boost training I want it to instead use It's brain and logic to evaluate the plans and of course GLMOCR. For it to figure out how read the plans and then use the conditions to perform the takeoffs. Let's come up with a plan to do this. I want a strategy that is going to be able to Make Accurate determinations quickly. \n</user_query>"
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nImplement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself.\n\nTo-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos.\n</user_query>"
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nBefore we proceed with anything else I want to pause for one hour\n</user_query>"
+    },
+    {
+      "role": "assistant",
+      "text": "Paused. I\u2019ll hold here.\n\nWhen you\u2019re ready (in about an hour), send `resume` and I\u2019ll continue from this exact no-Boost GLM plan state."
     }
   ]
 }
