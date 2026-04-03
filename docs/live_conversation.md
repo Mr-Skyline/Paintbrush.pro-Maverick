@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:41:05`
+- Updated: `2026-04-03 14:41:56`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1204`
+- Messages: `1206`
 
 ## Conversation
 
@@ -16105,3 +16105,13 @@ These are strong candidates for training symbol recognition (doors, frames, wind
 - **SESYD** (engineering/floorplan symbol spotting benchmark): [mathieu.delalandre.free.fr/projects/sesyd](http://mathieu.delalandre.free.fr/projects/sesyd/)
 
 If you want, next I’ll build a small `symbol_knowledge` ingestion pipeline in `scripts/` so Maverick can start with a local, queryable symbol library (class names, visual signatures, and nearest-neighbor examples) before we attach full model training.
+
+### 1205. USER
+
+<user_query>
+Do that
+</user_query>
+
+### 1206. ASSISTANT
+
+Great — I’ll build that symbol knowledge pipeline now: ingestion + indexed storage + nearest-match query, and wire it into CLI commands so you can feed open datasets in incrementally.
