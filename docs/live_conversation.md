@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 13:11:36`
+- Updated: `2026-04-03 13:15:10`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1141`
+- Messages: `1145`
 
 ## Conversation
 
@@ -15529,3 +15529,19 @@ To-do's from the plan have already been created. Do not create them again. Mark 
 <user_query>
 Proceed
 </user_query>
+
+### 1142. ASSISTANT
+
+Proceeding with execution now: I’ll run a fresh Boost->Analyze->Erase->Copy validation and produce a new summary/evidence pack so we can verify the strict `ceiling`/`gwb` lock behavior in practice.
+
+### 1143. ASSISTANT
+
+The run is active now; I’m monitoring it to completion and will report whether it locked to a single `ceiling`/`gwb` row and produced teacher-geometry-matched copy attempts.
+
+### 1144. ASSISTANT
+
+I found a runtime error from my last patch (`stale_cleanup` wasn’t initialized in `boost-then-copy-attempt`). I’m applying a direct fix now and rerunning immediately.
+
+### 1145. ASSISTANT
+
+I’ve now removed fallback clicking for condition selection in active mode, so it can only proceed on a real `ceiling`/`gwb` qty>0 lock. I’m running another full sequence to validate this behavior.
