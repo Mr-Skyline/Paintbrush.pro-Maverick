@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 12:45:31`
+- Updated: `2026-04-03 12:50:15`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1118`
+- Messages: `1121`
 
 ## Conversation
 
@@ -15266,3 +15266,37 @@ One of the problems that I observed is that the agent is attempting to select al
 ### 1118. ASSISTANT
 
 I see the issue — that’s a strong observation, and we can enforce it in code. I’m going to hard-gate training so it only proceeds when one specific Boost-used condition is selected (not any active row), then re-run a round with that lock.
+
+### 1119. ASSISTANT
+
+I’m implementing a strict **single-condition lock** now: the copy attempt must re-select the exact same condition row Boost used (by row index), otherwise it hard-fails before drawing. This directly targets the issue you identified.
+
+### 1120. ASSISTANT
+
+Round 2 is running with the new strict lock: it must select the exact Boost-used condition row index before any drawing. I’ll stop after this round and report the outcome for your evaluation.
+
+### 1121. ASSISTANT
+
+Round 2 finished with your new rule enforced, and it did exactly what you wanted (it blocked wrong-condition attempts).
+
+### What changed
+I added a strict **single-condition lock**:
+- Copy stage now receives the **exact Boost-used condition row index**.
+- Condition verification now requires `row_index_match == true` before any draw.
+
+### Round 2 outcome
+- Boost: success
+- Erase: success
+- Copy: blocked/fail (as intended) because it drifted to a different condition row
+- Artifact: `output/ost-training-lab/boost_then_copy_attempt_TP-0001_20260403_124949.json`
+
+### Key evidence
+- Expected row from Boost: `expected_condition_row_index: 4`
+- Later selection drifted to row `5`
+- `row_index_match: false`
+- Final reason: `condition_verification_failed`
+
+So this is progress: it no longer “blindly continues” on the wrong condition.
+
+If you approve, next round I’ll make one more targeted upgrade:
+- **hard click by row index anchor** (not ranked re-pick) once Boost row is known, so it keeps selecting row 4 consistently.
