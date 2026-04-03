@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:41:26`
+- Updated: `2026-04-03 11:42:05`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1094`
+- Messages: `1096`
 
 ## Conversation
 
@@ -15354,3 +15354,22 @@ Yes — for your runtime **screen reader/OCR path**, that is the right direction
 
 So:  
 **Runtime OCR = Z.ai GLM (primary) + Tesseract (fallback)** is the best setup for what you’re building.
+
+### 1095. USER
+
+<user_query>
+So should I sign up for the Pro plan or the MAX plan
+</user_query>
+
+### 1096. ASSISTANT
+
+For your use case, start with **Pro**.
+
+Why:
+- You’re validating OCR quality first, not max throughput yet.
+- Pro is usually enough to prove model compatibility + accuracy on your OST flow.
+- If you hit rate limits, concurrency limits, or vision model access limits, then upgrade to **Max**.
+
+Decision rule:
+- Choose **Pro now** if you’re in testing/tuning mode.
+- Move to **Max** only when you’re running long training blocks continuously and Pro becomes a bottleneck.
