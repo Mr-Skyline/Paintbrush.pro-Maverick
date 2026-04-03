@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 13:36:29`
+- Updated: `2026-04-03 13:49:50`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1167`
+- Messages: `1169`
 
 ## Conversation
 
@@ -15756,3 +15756,104 @@ To-do's from the plan have already been created. Do not create them again. Mark 
 ### 1167. ASSISTANT
 
 Understood — I’ll execute the attached plan exactly, keep the plan file untouched, and work through each existing to-do in order while marking status as I go. I’m starting with the first to-do now.
+
+### 1168. ASSISTANT
+
+I’m now implementing the runtime safety layer: single-attempt Boost mutex, strict cleanup verification, and phase-state telemetry so we can prove exactly what happened at each step.
+
+### 1169. ASSISTANT
+
+Implemented the full **Maverick Big-Change Stabilization Plan** and kept the plan file untouched.
+
+All attached plan to-dos were marked `in_progress`/`completed` and are now complete.
+
+### What was implemented
+
+- **Strict condition lock engine** (`phase1-condition-lock-engine`)
+  - Updated `scripts/ost_select_condition_row.py`:
+    - canonicalized allowed condition names to only `ceiling` / `gwb`
+    - enforced qty>0 and no `(unassigned)`
+    - added row lock confidence scoring and ambiguity rejection
+    - emits `selected_condition_confidence`, `active_candidate_count`, candidate diagnostics
+    - fails hard on low confidence/ambiguous locks (no fallback row click in active mode)
+
+- **Runtime mutex + cleanup guardrails** (`phase1-runtime-mutex-cleanup-guard`)
+  - Updated `scripts/ost_training_lab.py`:
+    - added per-project Boost mutex lock file (`boost_mutex_<project>.lock.json`)
+    - ensured one Boost flow at a time
+    - cleanup verification now records expected mode (`clear`), pre/post probes, and integrity telemetry
+    - phase timeline events added throughout boost/copy pipeline
+
+- **Focused motion diagnostics** (`phase1-focused-motion-diagnostics`)
+  - Updated `scripts/ost_style_walk.py`:
+    - ROI-focused frame analysis for `conditions_pane` and `active_canvas`
+    - per-frame region OCR + condition keyword hits
+    - writes region-aware diagnostics into `frame_analysis.json`
+    - still supports MP4 video capture
+  - Updated `scripts/ost_orchestrator.py`:
+    - `maverick-style-walk` now passes `--setup-config`
+
+- **Ordered teacher extraction** (`phase1-ordered-teacher-extraction`)
+  - Updated `scripts/ost_training_lab.py` `extract_boost_teacher_geometry(...)`:
+    - persists ordered vertices
+    - includes reverse order variant
+    - computes/stores `winding`, `area`, `perimeter`, `vertex_count`
+
+- **Single-click path planner** (`phase2-single-click-path-planner`)
+  - Updated `scripts/ost_left_blank_takeoff_attempt.py`:
+    - added planner from user-provided start point (`--user-start-x`, `--user-start-y`)
+    - picks nearest teacher polygon, rotates to nearest vertex, follows ordered path
+  - Updated pass-through in:
+    - `scripts/ost_training_lab.py`
+    - `scripts/ost_orchestrator.py` (`boost-then-copy-attempt` now accepts start coords)
+
+- **Geometry judge v2** (`phase2-geometry-judge-v2`)
+  - Updated `scripts/ost_left_blank_takeoff_attempt.py`:
+    - added oriented Hausdorff + area delta + winding + self-intersection checks
+    - explicit fail reasons:
+      - `vertex_drift`
+      - `winding_wrong`
+      - `area_delta_gt_3pct`
+      - `self_intersecting`
+      - `geometry_below_threshold`
+
+- **Evidence pack v2** (`phase2-evidence-pack-v2`)
+  - Updated `scripts/ost_left_blank_takeoff_attempt.py`:
+    - added `mismatch_heatmap.png`
+    - added `phase_timeline.json`
+    - includes planned path + user start metadata in attempt result
+
+- **Continuous non-blocking trainer** (`phase2-continuous-nonblocking-trainer`)
+  - Added `continuous-boost-copy` in:
+    - `scripts/ost_training_lab.py`
+    - `scripts/ost_orchestrator.py`
+  - Features:
+    - autonomous attempt loop
+    - periodic summaries every N attempts
+    - review queue for failed/low-confidence outcomes
+
+- **Telemetry + rollout gates** (`telemetry-success-gates`)
+  - Updated `scripts/maverick_runtime.py`:
+    - acceptance thresholds + rollout gate readiness
+    - condition lock success rate emphasized in quality/action candidates
+  - Updated `scripts/ost_training_lab.py` batch summary:
+    - acceptance thresholds + rollout readiness fields
+
+### Validation completed
+
+- `py_compile` passed for all modified scripts.
+- Lint diagnostics are clean for all modified files.
+- CLI validation passed for new/changed commands:
+  - `boost-then-copy-attempt` (with user start args)
+  - `continuous-boost-copy`
+  - `maverick-style-walk` (with setup-config + ROI diagnostics)
+
+### Next command to run now
+
+For autonomous continuous training with periodic summaries:
+
+`python scripts/ost_orchestrator.py continuous-boost-copy --project-id TP-0001 --registry scripts/ost_training_registry.json --monitor-index 1 --attempts 20 --summary-every 10 --condition-row first --left-choice nearest --match-score-threshold 55 --cleanup-undo-count 2 --attempt-style polyline4`
+
+And for start-point-driven Boost copy:
+
+`python scripts/ost_orchestrator.py boost-then-copy-attempt --project-id TP-0001 --registry scripts/ost_training_registry.json --monitor-index 1 --condition-row first --left-choice nearest --match-score-threshold 55 --cleanup-undo-count 2 --attempt-style polyline4 --boost-undo-count 10 --boost-populate-timeout-ms 60000 --boost-populate-poll-ms 3000 --boost-min-candidate-count 1 --user-start-x <x> --user-start-y <y>`
