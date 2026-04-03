@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:07:11`
+- Updated: `2026-04-03 14:07:26`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1178`
+- Messages: `1180`
 
 ## Conversation
 
@@ -15907,3 +15907,13 @@ Continuous training is live now. I’ll keep monitoring and report periodic resu
 ### 1178. ASSISTANT
 
 The continuous loop failed immediately due to a runtime bug I introduced (`phase_events` not initialized in the internal boost-copy function). I’m patching that now and restarting training right away.
+
+### 1179. USER
+
+<user_query>
+It appears as though the agent is expecting the condition to function the same as it does when boost is using it That's not possible. The agent has to use the tool as it was meant to be used
+</user_query>
+
+### 1180. ASSISTANT
+
+That’s a great catch, and you’re exactly right. I’m adjusting the workflow so `qty>0` is used only to **identify the Boost-used condition before erase**, but during the agent’s own takeoff it will select by the locked condition name/row (tool-normal behavior), not expect Boost-style quantity state. I’m patching this now.
