@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 16:43:47`
+- Updated: `2026-04-03 16:44:18`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1254`
+- Messages: `1257`
 
 ## Conversation
 
@@ -16600,3 +16600,22 @@ I identified the timeout source (too many expensive name-assist OCR calls) and j
 <user_query>
 How about you watch me do one
 </user_query>
+
+### 1255. ASSISTANT
+
+Absolutely—best next move.
+
+I’ll stop the current run so it doesn’t interfere, then switch into a pure watch/learn pass while you do one takeoff.
+
+### 1256. ASSISTANT
+
+Perfect—I'll watch and learn one full pass.
+
+I’m starting a live style-walk capture now (video + frame analysis). Go ahead and do one takeoff exactly your way; I’ll ingest it and report the learned pattern deltas right after.
+
+### 1257. ASSISTANT
+
+Recording is live now for 3 minutes.
+
+Do one complete takeoff exactly how you want Maverick to do it (including condition selection, start corner, click rhythm, and finish/cleanup).  
+When you’re done, send **`done`** and I’ll immediately parse the capture and convert it into concrete behavior updates.
