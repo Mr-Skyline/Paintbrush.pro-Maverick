@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:56:24`
+- Updated: `2026-04-03 11:57:10`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1119`
+- Messages: `1120`
 
 ## Conversation
 
@@ -15624,3 +15624,7 @@ If you want, I’ll resume the build validation block next.
 <user_query>
 Yes please continue
 </user_query>
+
+### 1120. ASSISTANT
+
+Resuming build now: I’ll run fresh 10 and 20 attempt validation blocks with GLM active, then extract the batch summary metrics (bad-work rate, condition verification pass rate, match distribution, GLM vs fallback usage).
