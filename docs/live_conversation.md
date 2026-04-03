@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:40:08`
+- Updated: `2026-04-03 11:41:26`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1090`
+- Messages: `1094`
 
 ## Conversation
 
@@ -15320,3 +15320,37 @@ Also: there isn’t a standard public model name I recognize as **“Claude Opus
 If you want, I can do either:
 1. keep Claude for coding + keep GLM for OCR (best blend), or  
 2. modify runtime OCR to use a different provider/model path.
+
+### 1091. USER
+
+<user_query>
+Oh OK so the Z.AI GLm-ocr Through the Z.AI API is the way to go?
+</user_query>
+
+### 1092. ASSISTANT
+
+Yes — for your runtime **screen reader/OCR path**, that is the right direction.
+
+- Use **Z.ai GLM vision via API** as primary OCR/read engine.
+- Keep **Tesseract fallback** for resilience when API/model/auth fails.
+- Keep Cursor model choice (Claude/Grok/etc.) separate for coding assistance.
+
+So:  
+**Runtime OCR = Z.ai GLM (primary) + Tesseract (fallback)** is the best setup for what you’re building.
+
+### 1093. USER
+
+<user_query>
+Oh OK so the Z.AI GLm-ocr Through the Z.AI API is the way to go?
+</user_query>
+
+### 1094. ASSISTANT
+
+Yes — for your runtime **screen reader/OCR path**, that is the right direction.
+
+- Use **Z.ai GLM vision via API** as primary OCR/read engine.
+- Keep **Tesseract fallback** for resilience when API/model/auth fails.
+- Keep Cursor model choice (Claude/Grok/etc.) separate for coding assistance.
+
+So:  
+**Runtime OCR = Z.ai GLM (primary) + Tesseract (fallback)** is the best setup for what you’re building.
