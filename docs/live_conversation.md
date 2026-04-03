@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:15:31`
+- Updated: `2026-04-03 14:17:02`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1189`
+- Messages: `1192`
 
 ## Conversation
 
@@ -15974,3 +15974,31 @@ If you want, I can pull the exact rules from those pages and convert them into a
 <user_query>
 Yes do that
 </user_query>
+
+### 1190. ASSISTANT
+
+I’ll extract the exact operational rules from those OST docs and turn them into a strict Maverick condition-handling spec you can use directly for training behavior.
+
+### 1191. ASSISTANT
+
+I’ve got enough official guidance now. I’m writing a strict “Maverick Condition Operating Spec” into the repo so it can be used as the canonical behavior contract during training runs.
+
+### 1192. ASSISTANT
+
+Done — I pulled the official OST guidance and converted it into a strict Maverick behavior contract.
+
+I added:
+
+- `docs/maverick_condition_operating_spec.md`
+
+It includes:
+
+- Official OST-derived rules for Conditions window behavior.
+- A strict **two-phase contract**:
+  - **Phase A (Boost discovery):** requires `ceiling`/`gwb` + qty>0 to lock condition.
+  - **Phase B (copy attempt):** selects by **locked condition identity** (name + row), and **does not** require qty>0 after erase.
+- Cleanup rules (`Ctrl+A` + `Delete` only).
+- Runtime safety/mutex expectations.
+- Acceptance gates (condition lock rate, quantity corruption prevention, geometry trend).
+
+This directly addresses your point that the condition cannot be expected to behave like Boost after erase.

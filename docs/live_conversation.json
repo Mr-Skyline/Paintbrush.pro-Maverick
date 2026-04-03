@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-04-03T14:15:31.804862",
+  "updated_at": "2026-04-03T14:17:02.423371",
   "source": "C:\\Users\\travi\\.cursor\\projects\\c-Users-travi-OneDrive-Documents-Paintbrush-pro\\agent-transcripts\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl",
-  "message_count": 1189,
+  "message_count": 1192,
   "messages": [
     {
       "role": "user",
@@ -4758,6 +4758,18 @@
     {
       "role": "user",
       "text": "<user_query>\nYes do that\n</user_query>"
+    },
+    {
+      "role": "assistant",
+      "text": "I\u2019ll extract the exact operational rules from those OST docs and turn them into a strict Maverick condition-handling spec you can use directly for training behavior."
+    },
+    {
+      "role": "assistant",
+      "text": "I\u2019ve got enough official guidance now. I\u2019m writing a strict \u201cMaverick Condition Operating Spec\u201d into the repo so it can be used as the canonical behavior contract during training runs."
+    },
+    {
+      "role": "assistant",
+      "text": "Done \u2014 I pulled the official OST guidance and converted it into a strict Maverick behavior contract.\n\nI added:\n\n- `docs/maverick_condition_operating_spec.md`\n\nIt includes:\n\n- Official OST-derived rules for Conditions window behavior.\n- A strict **two-phase contract**:\n  - **Phase A (Boost discovery):** requires `ceiling`/`gwb` + qty>0 to lock condition.\n  - **Phase B (copy attempt):** selects by **locked condition identity** (name + row), and **does not** require qty>0 after erase.\n- Cleanup rules (`Ctrl+A` + `Delete` only).\n- Runtime safety/mutex expectations.\n- Acceptance gates (condition lock rate, quantity corruption prevention, geometry trend).\n\nThis directly addresses your point that the condition cannot be expected to behave like Boost after erase."
     }
   ]
 }
