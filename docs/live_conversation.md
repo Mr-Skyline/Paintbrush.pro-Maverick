@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 12:54:11`
+- Updated: `2026-04-03 12:55:35`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1125`
+- Messages: `1127`
 
 ## Conversation
 
@@ -15336,3 +15336,13 @@ Round result after change:
 This is the correct fail behavior under your rule: if it can’t prove the condition is ceiling or GWB by name, it does not continue.
 
 If you approve, next step is to improve only the condition-name OCR clarity in the conditions panel so it can reliably lock `ceiling`/`gwb` and then proceed to shape matching.
+
+### 1126. USER
+
+<user_query>
+Yes please proceed
+</user_query>
+
+### 1127. ASSISTANT
+
+Proceeding — I’m improving condition-name OCR in the selector now so it prioritizes **qty>0 rows first**, then performs stronger name extraction (including targeted GLM assist when needed) to lock `ceiling`/`gwb` by name. After patching, I’ll run one training round and stop for your review.
