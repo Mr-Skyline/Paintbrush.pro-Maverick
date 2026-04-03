@@ -10,3 +10,4 @@ dist/
 %APPDATA%/
 *token*.txt
 *api*.txt
+telegram*.txt
