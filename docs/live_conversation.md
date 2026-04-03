@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 10:29:20`
+- Updated: `2026-04-03 10:29:45`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1049`
+- Messages: `1051`
 
 ## Conversation
 
@@ -14850,3 +14850,13 @@ I also started it for you (it is actively running now).
   - `powershell -ExecutionPolicy Bypass -File "scripts/start_conversation_sync.ps1" -NoAutoPush`
 
 If you want, next I can set it as a Windows startup task so it always stays on.
+
+### 1050. USER
+
+<user_query>
+Yes do that
+</user_query>
+
+### 1051. ASSISTANT
+
+Got it — I’ll make this persistent by adding a Windows Scheduled Task that launches the conversation sync at logon, then I’ll register it now and verify it’s enabled.
