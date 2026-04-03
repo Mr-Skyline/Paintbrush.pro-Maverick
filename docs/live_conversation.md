@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:07:26`
+- Updated: `2026-04-03 14:07:44`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1180`
+- Messages: `1181`
 
 ## Conversation
 
@@ -15917,3 +15917,9 @@ It appears as though the agent is expecting the condition to function the same a
 ### 1180. ASSISTANT
 
 That’s a great catch, and you’re exactly right. I’m adjusting the workflow so `qty>0` is used only to **identify the Boost-used condition before erase**, but during the agent’s own takeoff it will select by the locked condition name/row (tool-normal behavior), not expect Boost-style quantity state. I’m patching this now.
+
+### 1181. USER
+
+<user_query>
+Not the tool but the condition
+</user_query>
