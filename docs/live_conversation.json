@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-04-03T12:50:15.434356",
+  "updated_at": "2026-04-03T12:52:38.950492",
   "source": "C:\\Users\\travi\\.cursor\\projects\\c-Users-travi-OneDrive-Documents-Paintbrush-pro\\agent-transcripts\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl",
-  "message_count": 1121,
+  "message_count": 1123,
   "messages": [
     {
       "role": "user",
@@ -4486,6 +4486,14 @@
     {
       "role": "assistant",
       "text": "Round 2 finished with your new rule enforced, and it did exactly what you wanted (it blocked wrong-condition attempts).\n\n### What changed\nI added a strict **single-condition lock**:\n- Copy stage now receives the **exact Boost-used condition row index**.\n- Condition verification now requires `row_index_match == true` before any draw.\n\n### Round 2 outcome\n- Boost: success\n- Erase: success\n- Copy: blocked/fail (as intended) because it drifted to a different condition row\n- Artifact: `output/ost-training-lab/boost_then_copy_attempt_TP-0001_20260403_124949.json`\n\n### Key evidence\n- Expected row from Boost: `expected_condition_row_index: 4`\n- Later selection drifted to row `5`\n- `row_index_match: false`\n- Final reason: `condition_verification_failed`\n\nSo this is progress: it no longer \u201cblindly continues\u201d on the wrong condition.\n\nIf you approve, next round I\u2019ll make one more targeted upgrade:\n- **hard click by row index anchor** (not ranked re-pick) once Boost row is known, so it keeps selecting row 4 consistently."
+    },
+    {
+      "role": "user",
+      "text": "<user_query>\nIf it's looking for the condition by anything other than the name of the condition then it's likely not going to find the condition The only two conditions that for this exercise are ceiling and GWB. If the agent is attempting to look for anything else regarding conditions  it is wrong\n</user_query>"
+    },
+    {
+      "role": "assistant",
+      "text": "Agreed. I\u2019m enforcing this strictly in code now: condition matching will only allow names containing `ceiling` or `gwb`, and the boost-copy workflow will fail early if it can\u2019t lock one of those two by name."
     }
   ]
 }

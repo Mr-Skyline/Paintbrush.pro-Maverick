@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 12:50:15`
+- Updated: `2026-04-03 12:52:38`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1121`
+- Messages: `1123`
 
 ## Conversation
 
@@ -15300,3 +15300,13 @@ So this is progress: it no longer “blindly continues” on the wrong condition
 
 If you approve, next round I’ll make one more targeted upgrade:
 - **hard click by row index anchor** (not ranked re-pick) once Boost row is known, so it keeps selecting row 4 consistently.
+
+### 1122. USER
+
+<user_query>
+If it's looking for the condition by anything other than the name of the condition then it's likely not going to find the condition The only two conditions that for this exercise are ceiling and GWB. If the agent is attempting to look for anything else regarding conditions  it is wrong
+</user_query>
+
+### 1123. ASSISTANT
+
+Agreed. I’m enforcing this strictly in code now: condition matching will only allow names containing `ceiling` or `gwb`, and the boost-copy workflow will fail early if it can’t lock one of those two by name.
