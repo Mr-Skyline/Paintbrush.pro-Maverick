@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:11:19`
+- Updated: `2026-04-03 14:14:54`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1185`
+- Messages: `1186`
 
 ## Conversation
 
@@ -15944,3 +15944,9 @@ Exactly — and I’ve now implemented that distinction:
 - **Copy phase:** uses **locked condition identity** (name + row), not Boost qty behavior.
 
 I also cleared the stale lock-holder process and relaunched autonomous continuous training. It is now actively running (first attempt in progress). I’ll keep monitoring and report the first 5-attempt summary as soon as it lands.
+
+### 1186. USER
+
+<user_query>
+Does on screen have any literature that explains how to operate the conditions while in take off window
+</user_query>
