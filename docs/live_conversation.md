@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 13:01:45`
+- Updated: `2026-04-03 13:11:12`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1131`
+- Messages: `1135`
 
 ## Conversation
 
@@ -15386,3 +15386,108 @@ To-do's from the plan have already been created. Do not create them again. Mark 
 ### 1131. ASSISTANT
 
 I’m starting implementation now and will work through each to-do in order, end-to-end. First step is marking the first to-do in progress and wiring the condition-parser lock/deterministic row targeting completely, then I’ll move into teacher geometry extraction and gating.
+
+### 1132. ASSISTANT
+
+I’m now adding the core “teacher target + geometry gate + evidence pack” wiring in the copy-attempt script so the agent learns from Boost geometry, not just candidate score.
+
+### 1133. ASSISTANT
+
+I’ve moved on to telemetry and control-flow hardening now: adding condition-lock/geometry metrics in batch summaries plus reliability guards and 5-attempt block enforcement.
+
+### 1134. ASSISTANT
+
+Core implementation is now in place across parser, teacher extraction, geometry gate, retries, evidence artifacts, telemetry, and reliability controls. I’m doing one final pass on command surfaces/flow consistency, then I’ll mark the remaining to-dos complete and share exactly what changed.
+
+### 1135. ASSISTANT
+
+Implemented the attached Expanded Boost-Copy plan end-to-end without editing the plan file, and I marked all existing to-dos through `in_progress` to `completed` as work progressed.
+
+### What I changed
+
+- **Condition parser lock (`condition-parser-lock`)**
+  - Updated `scripts/ost_select_condition_row.py` to support deterministic row locking with `--target-row-index`.
+  - Enforced strict behavior: if a forced row index is provided and not found, selection fails early (instead of silently falling back).
+  - Persisted `selected_condition_row_index` in output for downstream lock validation.
+
+- **Boost teacher geometry extraction (`boost-teacher-geometry`)**
+  - Added `extract_boost_teacher_geometry(...)` in `scripts/ost_training_lab.py`.
+  - Extracts/persists teacher targets from post-Boost classification into `teacher_targets` JSON with:
+    - `id`
+    - `bbox_global`
+    - `center_global`
+    - `polygon_points`
+    - source metadata
+  - Wired this into `boost-then-copy-attempt` and added a **teacher extraction gate** (`teacher_extraction_failed`).
+
+- **Strict geometric match gate (`geometry-match-gate`)**
+  - Extended `scripts/ost_left_blank_takeoff_attempt.py` with:
+    - `--teacher-targets-json`
+    - `--geometry-score-threshold`
+  - Added `_compute_geometry_match(...)` to score attempted stroke points vs teacher polygon targets.
+  - Included geometry in pass/fail logic (`is_match` now requires `geometry_ok`).
+
+- **Adaptive retry policy (`adaptive-retry-policy`)**
+  - Refactored `strict_trials` in `scripts/ost_training_lab.py` to bounded, single-variable adjustments per retry:
+    - baseline
+    - start corner shift
+    - pre-click threshold tighten
+    - expected-distance tighten
+    - expected-distance widen
+  - Preserved condition lock (`ceiling/gwb` + expected row index) on every retry.
+
+- **Evidence pack artifacts (`evidence-pack`)**
+  - Added evidence generation in `scripts/ost_left_blank_takeoff_attempt.py`:
+    - `selected_condition_proof.png`
+    - `boost_teacher_overlay.png`
+    - `attempt_overlay.png`
+    - `mismatch_overlay.png`
+  - Artifacts are stored under each attempt’s `evidence_pack` directory and referenced in result JSON.
+
+- **Telemetry upgrades (`telemetry-upgrade`)**
+  - Enhanced `scripts/ost_training_lab.py` batch summary with:
+    - `condition_lock_success_rate`
+    - `teacher_extraction_success_rate`
+    - `geometry_pass_rate`
+    - existing failure-reason rollups
+  - Enhanced `scripts/maverick_runtime.py` estimator QA + quality gates with:
+    - geometry score/status
+    - condition-lock success rate
+    - teacher extraction success rate
+    - geometry-aware next actions.
+
+- **Reliability hardening (`reliability-hardening`)**
+  - Added stale worker cleanup helper in `scripts/ost_training_lab.py`:
+    - `cleanup_stale_ost_processes()` (targets stale OST automation python workers only).
+  - Added phase timeouts around critical subprocess steps in `boost-then-copy-attempt`.
+  - Added timeout handling in `run_takeoff_copy_attempt(...)`.
+  - Added orchestration timeouts in `scripts/ost_orchestrator.py` via enhanced `run_cmd(..., timeout_s=...)`.
+
+- **5-attempt micro-block control (`micro-block-control`)**
+  - Enforced block cap in batch flow:
+    - `takeoff-copy-batch` now runs max 5 attempts per block and records remaining requested attempts.
+  - Added explicit micro-block review metadata in summaries:
+    - `review_required`
+    - `block_stop_required`
+    - block sizing details
+  - Updated orchestrator help/default to communicate 5-attempt cap.
+
+### Files updated
+
+- `scripts/ost_select_condition_row.py`
+- `scripts/ost_left_blank_takeoff_attempt.py`
+- `scripts/ost_training_lab.py`
+- `scripts/maverick_runtime.py`
+- `scripts/ost_orchestrator.py`
+
+### Validation run
+
+- Syntax check passed:
+  - `python -m py_compile` on all modified scripts
+- Lint diagnostics:
+  - no linter errors in modified files
+- CLI sanity checks passed:
+  - `scripts/ost_left_blank_takeoff_attempt.py --help` (new args visible)
+  - `scripts/ost_orchestrator.py takeoff-copy-batch --help` (5-attempt cap messaging visible)
+
+If you want, I can immediately run a live `boost-then-copy-attempt` and then a `takeoff-copy-batch` block to generate a fresh evidence pack + telemetry block summary for your review.
