@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 13:11:12`
+- Updated: `2026-04-03 13:11:36`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1135`
+- Messages: `1141`
 
 ## Conversation
 
@@ -15491,3 +15491,41 @@ Implemented the attached Expanded Boost-Copy plan end-to-end without editing the
   - `scripts/ost_orchestrator.py takeoff-copy-batch --help` (5-attempt cap messaging visible)
 
 If you want, I can immediately run a live `boost-then-copy-attempt` and then a `takeoff-copy-batch` block to generate a fresh evidence pack + telemetry block summary for your review.
+
+### 1136. USER
+
+<user_query>
+One of the problems that I observed is that the agent is attempting to select all of the conditions instead of selecting a single condition. In order for the agent to get it right the agent must only select the that the boost feature used. The agent will know that the boost feature used the condition because the snapshot that the agent will will display a quantity next to the name of the condition in the conditions sidebar menu. The agent has to select the condition and then identify where that condition was used by the boost FE and then match all of the same points on all of the various Polygon shapes that were produced by the boost feature. We are doing this the agent where the boost would do it if the boost feature were disabled
+</user_query>
+
+### 1137. USER
+
+<user_query>
+If it's looking for the condition by anything other than the name of the condition then it's likely not going to find the condition The only two conditions that for this exercise are ceiling and GWB. If the agent is attempting to look for anything else regarding conditions  it is wrong
+</user_query>
+
+### 1138. USER
+
+<user_query>
+Yes please proceed
+</user_query>
+
+### 1139. USER
+
+<user_query>
+Yes I approve but let's come up with a  plan that incorporates more changes
+</user_query>
+
+### 1140. USER
+
+<user_query>
+Implement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself.
+
+To-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos.
+</user_query>
+
+### 1141. USER
+
+<user_query>
+Proceed
+</user_query>
