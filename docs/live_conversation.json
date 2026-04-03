@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-04-03T16:52:51.584035",
+  "updated_at": "2026-04-03T16:55:19.218987",
   "source": "C:\\Users\\travi\\.cursor\\projects\\c-Users-travi-OneDrive-Documents-Paintbrush-pro\\agent-transcripts\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl",
-  "message_count": 1266,
+  "message_count": 1268,
   "messages": [
     {
       "role": "user",
@@ -5066,6 +5066,14 @@
     {
       "role": "assistant",
       "text": "Understood \u2014 I\u2019ll add a global \u201ctriple-space emergency pause\u201d listener that can instantly halt active Maverick automation processes, then wire it into the orchestrator/runtime so it\u2019s always available."
+    },
+    {
+      "role": "assistant",
+      "text": "I\u2019m implementing a Windows-native hotkey watcher (no extra dependencies) that listens for triple-space and force-pauses all Maverick/OST Python processes in this workspace instantly. After that I\u2019ll start it for you."
+    },
+    {
+      "role": "assistant",
+      "text": "Configured and running.\n\nI added `scripts/ost_emergency_pause_hotkey.py` and started it in watch mode, so pressing **Space 3 times quickly** now triggers an emergency pause.\n\nWhat it does on trigger:\n- Writes a pause flag at `output/maverick/emergency_pause.flag`\n- Force-stops active Python automation processes for this workspace (Maverick/OST scripts)\n- Uses a short cooldown to avoid repeated accidental triggers\n\nUseful commands:\n- Start watcher:\n  - `python \"scripts/ost_emergency_pause_hotkey.py\" watch --window-ms 1200 --poll-ms 30 --cooldown-ms 1800`\n- Pause immediately (manual test):\n  - `python \"scripts/ost_emergency_pause_hotkey.py\" pause-now`\n- Clear pause flag:\n  - `python \"scripts/ost_emergency_pause_hotkey.py\" clear`\n\nIf you want, I can also set this watcher to auto-start on login so it\u2019s always armed."
     }
   ]
 }
