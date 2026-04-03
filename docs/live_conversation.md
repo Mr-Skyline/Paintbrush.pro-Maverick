@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 16:51:51`
+- Updated: `2026-04-03 16:52:51`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1264`
+- Messages: `1266`
 
 ## Conversation
 
@@ -16653,3 +16653,13 @@ I found another hard blocker (row index `0` was being coerced to `-1` during ver
 Stopped. I’ve halted the active repeat attempt.
 
 Nothing else is running from my side now.
+
+### 1265. USER
+
+<user_query>
+We need to set up a way to stop everything immediately. set up command for when I press the spacebar three times consecutively to pause everything
+</user_query>
+
+### 1266. ASSISTANT
+
+Understood — I’ll add a global “triple-space emergency pause” listener that can instantly halt active Maverick automation processes, then wire it into the orchestrator/runtime so it’s always available.
