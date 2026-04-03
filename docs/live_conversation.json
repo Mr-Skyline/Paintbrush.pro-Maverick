@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-04-03T13:15:23.395329",
+  "updated_at": "2026-04-03T13:19:32.236690",
   "source": "C:\\Users\\travi\\.cursor\\projects\\c-Users-travi-OneDrive-Documents-Paintbrush-pro\\agent-transcripts\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl",
-  "message_count": 1146,
+  "message_count": 1148,
   "messages": [
     {
       "role": "user",
@@ -4586,6 +4586,14 @@
     {
       "role": "user",
       "text": "<user_query>\nPlease remove all blocks There's no need for you to be blocked on anything\n</user_query>"
+    },
+    {
+      "role": "assistant",
+      "text": "Understood. I\u2019ll remove blocking behavior so training can continue without hard-stop gates/pause blockers, while still keeping strict `ceiling`/`gwb` condition logic intact. I\u2019m applying that now and then rerunning."
+    },
+    {
+      "role": "assistant",
+      "text": "Removed the blocking behavior so the workflow can keep running without artificial stop gates, while keeping strict condition correctness (`ceiling`/`gwb` only).\n\n### What I changed\n\n- `scripts/ost_training_lab.py`\n  - Removed hard micro-block stop behavior:\n    - batch attempts are no longer capped at 5.\n    - `micro_block.block_stop_required` and `review_required` are now `false`.\n  - Made Boost step less \u201cblocked\u201d:\n    - added retry loop for Boost run-directory detection (instead of single-shot fail).\n  - Moved condition-lock timing to **after Boost population** (so qty evidence is present when locking).\n  - Added condition-lock retries (3 attempts) post-Boost before concluding lock failure.\n  - Kept strict name lock gate (`ceiling`/`gwb`) intact.\n\n- `scripts/ost_orchestrator.py`\n  - Removed attempt auto-cap in `takeoff-copy-batch` (runs requested count).\n  - Updated help text to reflect requested attempts are not capped.\n\n- `scripts/ost_select_condition_row.py`\n  - Removed fallback click behavior in `active_qty_non_unassigned` mode.\n  - If it cannot lock a valid active `ceiling`/`gwb` row, it now returns explicit failure instead of clicking fallback anchors.\n  - This prevents \u201cselecting all / wrong condition\u201d behavior.\n\n### Validation\n\n- Syntax checks pass (`py_compile`) on updated files.\n- Lints clean.\n- Reran `boost-then-copy-attempt`:\n  - It now proceeds with the updated non-blocking flow.\n  - Current failure is **strict lock failure** (`boost_condition_not_locked_to_ceiling_or_gwb`) because no valid `ceiling`/`gwb` qty>0 lock was detected in that run.\n\nIf you want, I\u2019ll now run an autonomous retry cycle (multiple full Boost->Analyze->Erase->Copy passes) until we get a valid `ceiling`/`gwb` lock and a full copy attempt."
     }
   ]
 }
