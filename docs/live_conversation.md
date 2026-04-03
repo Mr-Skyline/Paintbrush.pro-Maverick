@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:58:44`
+- Updated: `2026-04-03 15:12:45`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1218`
+- Messages: `1223`
 
 ## Conversation
 
@@ -16271,3 +16271,86 @@ Implement the plan as specified, it is attached for your reference. Do NOT edit 
 
 To-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos.
 </user_query>
+
+### 1219. ASSISTANT
+
+I’m starting implementation now and will work through the existing plan to-dos in order, marking each one `in_progress` and then `completed` as I finish it.
+
+### 1220. ASSISTANT
+
+I’m implementing Phase 1 now: safety scanner + quarantine/manifests integrated into ingestion before any indexing happens.
+
+### 1221. ASSISTANT
+
+I’m moving into Phase 3 now: building the merged finish knowledge index (symbol + height + design-set signatures) with dedupe/quality thresholds.
+
+### 1222. ASSISTANT
+
+I’ve finished the main implementation across all five phases and I’m running validation now (syntax + lint) before I mark all remaining to-dos complete.
+
+### 1223. ASSISTANT
+
+Implemented end-to-end. I completed all 5 plan to-dos without editing the plan file, and marked each to-do complete.
+
+### What I changed
+
+- Added safety-first ingestion scanner:
+  - `scripts/ost_dataset_safety_scan.py`
+  - Scans extensions, size limits, hashes files, blocks executable/script types, warns on unknown/archive/oversized files.
+- Upgraded ingestion to quarantine-first flow:
+  - `scripts/ost_symbol_knowledge_ingest.py`
+  - Runs safety scan before ingest, enforces warnings policy, copies images to quarantine staging, writes ingest manifest + provenance.
+- Added finish taxonomy baseline:
+  - `scripts/ost_finish_taxonomy.json`
+  - Trades, aliases, ceiling subtype focus, height notation patterns, design-set signatures.
+- Added high-volume merged finish index builder:
+  - `scripts/ost_finish_knowledge_index.py`
+  - Merges symbol indices, dedupes prototypes, computes support/quality, builds:
+    - symbol index
+    - height notation index
+    - design-set signature index
+    - finish trade frequency index
+- Wired new orchestration commands:
+  - `scripts/ost_orchestrator.py`
+  - New commands:
+    - `dataset-safety-scan`
+    - `symbol-knowledge-ingest` (expanded with safety/quarantine options)
+    - `finish-knowledge-index-build`
+- Integrated finish inference into runtime takeoff behavior:
+  - `scripts/ost_left_blank_takeoff_attempt.py`
+  - Infers finish trade + design-set hint from selected condition/style + taxonomy/index.
+  - Adds confidence-gated fallback behavior for low-confidence count paths.
+  - Persists `finish_inference` and fallback info in attempt output.
+- Extended training schema + telemetry:
+  - `scripts/ost_training_registry.example.json` (new `finish_profile`)
+  - `scripts/ost_training_program.json` (`trade_focus` tags on modules)
+  - `scripts/ost_training_lab.py`
+    - protocol checklist extended with finish/ceiling/height checks
+    - registry initialization seeds `finish_profile`
+    - attempt payloads now include `finish_learning_snapshot` + `finish_inference_confidence`
+    - batch summaries include average finish confidence
+    - added finish review queue:
+      - `output/ost-training-lab/review_queue/finish_review_queue.json`
+- Expanded Maverick QA gates for finish signals:
+  - `scripts/maverick_runtime.py`
+  - Tracks finish inference confidence stats, status, rollout gate threshold, and pending review queue count.
+- Updated docs:
+  - `docs/symbol_knowledge_pipeline.md`
+  - Added safety scan workflow + merged finish index command.
+
+### Validation completed
+
+- Python compile checks passed for all modified scripts.
+- Lint diagnostics: no errors.
+- CLI help validated for new commands and options.
+
+### Ready-to-run full-power flow
+
+1. Safety scan:
+   - `python scripts/ost_orchestrator.py dataset-safety-scan --dataset-root "<DATASET_ROOT>" --report-json "output/ost-training-lab/symbol_knowledge/TP-0001/safety_scan.json"`
+2. Ingest with quarantine:
+   - `python scripts/ost_orchestrator.py symbol-knowledge-ingest --project-id TP-0001 --dataset-root "<DATASET_ROOT>" --dataset-name finishes_corpus`
+3. Build merged finish intelligence index:
+   - `python scripts/ost_orchestrator.py finish-knowledge-index-build --project-id TP-0001`
+
+If you want, I’ll run this now on your first dataset path and produce the first safety + ingestion + merged index artifacts in one pass.
