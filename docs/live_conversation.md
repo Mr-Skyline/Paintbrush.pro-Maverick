@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:42:05`
+- Updated: `2026-04-03 11:46:14`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1096`
+- Messages: `1100`
 
 ## Conversation
 
@@ -15373,3 +15373,59 @@ Why:
 Decision rule:
 - Choose **Pro now** if you’re in testing/tuning mode.
 - Move to **Max** only when you’re running long training blocks continuously and Pro becomes a bottleneck.
+
+### 1097. USER
+
+<user_query>
+bc1b243c6ddf42299036f92c701da0ef.L4b2Vobg5bQpX4Ut api key for Z.ai 
+</user_query>
+
+### 1098. ASSISTANT
+
+Got it — but that key is now **exposed** because it was pasted in chat.
+
+### Do this now (important)
+1. **Revoke that key** in Z.ai immediately.
+2. Create a **new** API key.
+3. Set only the new key locally (don’t paste it in chat).
+
+### Set it on your machine
+```powershell
+setx GLMOCR_API_KEY "YOUR_NEW_ZAI_KEY"
+```
+Then restart Cursor/terminal.
+
+### Optional session-only (no persistence)
+```powershell
+$env:GLMOCR_API_KEY="YOUR_NEW_ZAI_KEY"
+```
+
+Once done, say `retest now` and I’ll run the OCR smoke test to confirm GLM is active.
+
+### 1099. USER
+
+<user_query>
+bc1b243c6ddf42299036f92c701da0ef.L4b2Vobg5bQpX4Ut api key for Z.ai 
+</user_query>
+
+### 1100. ASSISTANT
+
+Got it — but that key is now **exposed** because it was pasted in chat.
+
+### Do this now (important)
+1. **Revoke that key** in Z.ai immediately.
+2. Create a **new** API key.
+3. Set only the new key locally (don’t paste it in chat).
+
+### Set it on your machine
+```powershell
+setx GLMOCR_API_KEY "YOUR_NEW_ZAI_KEY"
+```
+Then restart Cursor/terminal.
+
+### Optional session-only (no persistence)
+```powershell
+$env:GLMOCR_API_KEY="YOUR_NEW_ZAI_KEY"
+```
+
+Once done, say `retest now` and I’ll run the OCR smoke test to confirm GLM is active.
