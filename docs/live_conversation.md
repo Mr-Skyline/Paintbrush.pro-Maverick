@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 10:28:51`
+- Updated: `2026-04-03 10:29:20`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1047`
+- Messages: `1049`
 
 ## Conversation
 
@@ -14817,3 +14817,36 @@ Yes — I can set this up. I’m going to build a GitHub “conversation bridge�
 <user_query>
 I want the updates to automatically and immediately
 </user_query>
+
+### 1048. ASSISTANT
+
+Understood — I’ll set up a live GitHub sync so conversation updates are exported and pushed automatically as new transcript lines appear. I’m adding a watcher script plus a one-command launcher you can run and leave on.
+
+### 1049. ASSISTANT
+
+Done — it’s now set up for **automatic, immediate GitHub updates** of the conversation bridge.
+
+What I added:
+
+- `scripts/conversation_github_sync.py`
+  - Reads the transcript JSONL
+  - Publishes to:
+    - `docs/live_conversation.md`
+    - `docs/live_conversation.json`
+  - Redacts obvious key/token patterns
+  - Can auto-commit and auto-push on change
+
+- `scripts/start_conversation_sync.ps1`
+  - One-command launcher
+  - Runs in watch mode every ~2s
+  - Auto-push enabled by default
+
+I also started it for you (it is actively running now).
+
+### How to use
+- Start (auto-push on):
+  - `powershell -ExecutionPolicy Bypass -File "scripts/start_conversation_sync.ps1"`
+- Start without pushing (local file updates only):
+  - `powershell -ExecutionPolicy Bypass -File "scripts/start_conversation_sync.ps1" -NoAutoPush`
+
+If you want, next I can set it as a Windows startup task so it always stays on.
