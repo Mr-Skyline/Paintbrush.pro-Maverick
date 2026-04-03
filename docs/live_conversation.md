@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:53:46`
+- Updated: `2026-04-03 11:54:00`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1113`
+- Messages: `1115`
 
 ## Conversation
 
@@ -15573,3 +15573,23 @@ If you want, I can also patch `ocr_engine.py` to read `.env.txt` automatically (
 <user_query>
 Retest now.
 </user_query>
+
+### 1114. ASSISTANT
+
+Retesting now from this runtime session to confirm whether GLM key is visible and active.
+
+### 1115. ASSISTANT
+
+Retest result is unchanged:
+
+- `has_key: false` in this session
+- GLM still 401
+- Fallback to Tesseract
+
+So the key still isn’t visible to this running shell.
+
+### Quick path to unblock
+I can patch `ocr_engine.py` now to auto-read `GLMOCR_API_KEY` from `.env.txt` in your project folder, same as the Grok connector.  
+Then your folder-based key will work immediately without session env hassles.
+
+If you want, say `patch env reader` and I’ll do it now.
