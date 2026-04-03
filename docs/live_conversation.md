@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 12:40:58`
+- Updated: `2026-04-03 12:45:31`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1116`
+- Messages: `1118`
 
 ## Conversation
 
@@ -15256,3 +15256,13 @@ If you want, for **Round 2** I can apply one targeted change first:
 3) switch first-pass row selection to second row and retry gate.
 
 Tell me which one you want for the next round.
+
+### 1117. USER
+
+<user_query>
+One of the problems that I observed is that the agent is attempting to select all of the conditions instead of selecting a single condition. In order for the agent to get it right the agent must only select the that the boost feature used. The agent will know that the boost feature used the condition because the snapshot that the agent will will display a quantity next to the name of the condition in the conditions sidebar menu. The agent has to select the condition and then identify where that condition was used by the boost FE and then match all of the same points on all of the various Polygon shapes that were produced by the boost feature. We are doing this the agent where the boost would do it if the boost feature were disabled
+</user_query>
+
+### 1118. ASSISTANT
+
+I see the issue — that’s a strong observation, and we can enforce it in code. I’m going to hard-gate training so it only proceeds when one specific Boost-used condition is selected (not any active row), then re-run a round with that lock.
