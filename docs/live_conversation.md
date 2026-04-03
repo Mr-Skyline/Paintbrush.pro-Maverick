@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 16:57:47`
+- Updated: `2026-04-03 17:04:08`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1273`
+- Messages: `1274`
 
 ## Conversation
 
@@ -16725,3 +16725,7 @@ Yes please do that And then I want to have a planning meeting
 ### 1273. ASSISTANT
 
 I’ll propagate the OST-window clamp across the other active automation scripts, run a quick compile check, then switch us into a focused planning meeting format right after.
+
+### 1274. ASSISTANT
+
+I’m now applying the same window clamp to Boost/setup/condition scripts so every click path is bounded, not just left-blank attempts.
