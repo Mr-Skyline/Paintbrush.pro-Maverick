@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 16:55:19`
+- Updated: `2026-04-03 16:55:54`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1268`
+- Messages: `1270`
 
 ## Conversation
 
@@ -16688,3 +16688,13 @@ Useful commands:
   - `python "scripts/ost_emergency_pause_hotkey.py" clear`
 
 If you want, I can also set this watcher to auto-start on login so it’s always armed.
+
+### 1269. USER
+
+<user_query>
+The area that the agent was trying to work in on that last go around was the wrong area You need to make sure that he sticks to the OST window
+</user_query>
+
+### 1270. ASSISTANT
+
+Makes sense — I’ll harden the click pipeline so every action is clamped/validated against the active OST window bounds before it can execute, then I’ll run a quick dry check.
