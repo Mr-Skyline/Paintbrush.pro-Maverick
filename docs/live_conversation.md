@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 14:38:47`
+- Updated: `2026-04-03 14:41:05`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1201`
+- Messages: `1204`
 
 ## Conversation
 
@@ -16050,3 +16050,58 @@ I’ll keep it running and continue monitoring; as soon as the first block summa
 <user_query>
 Important for you to understand how to identify whether or not a condition is an area condition a linear or a count The only way to do it is by opening the condition and reading the style drop down menu line It will tell you what the condition is The agent can then learn about the rest of the condition and then close the condition. Now that the agent knows the type of condition that it is it will know how to use it an area condition will require multiple clicks in order to form a Polygon shape a linear condition will require a single Click to start and then a single Click to keep the line following a particular path at a corner or a joint on the Polygon or between polygons To terminate the line of a linear takeoff a double click is required. the count condition is pretty straightforward it counts I like to have it count specific items Like door frames and doors but it needs to have logic like what does a door frame look like on a set of plans and how do I know that there is a door here If there is a door frame there is likely a door or if the plan doesn't show a frame but it shows then there is likely a frame as well. It needs to know how to identify things like windows, Sinks and toilets. It might be a good idea to find a database that we can tap into that teach you how to read plans better We're wanting something that You with examples of all the various things that we might find in a set of blueprints regarding Symbols, textures, patterns. You might also asked for help researching databases that have the information Readily available and open source
 </user_query>
+
+### 1202. ASSISTANT
+
+Great guidance — this is exactly the missing logic layer. I’m going to implement a new condition-type introspection step (open condition, read Style field, close) and wire behavior selection to `area`/`linear`/`count`, then I’ll add an external-symbol research pack with candidate open datasets for blueprint symbols/patterns.
+
+### 1203. ASSISTANT
+
+You’re right, and I’m implementing that rule now: Maverick will open the selected condition, read the **Style** value (`area` / `linear` / `count`), close it, then choose the matching takeoff behavior automatically for that attempt. I’ll wire this directly into the copy flow.
+
+### 1204. ASSISTANT
+
+Perfect — this is the right direction, and I’ve already started implementing it.
+
+You’re saying condition usage must be driven by **condition style**, and style must be read by **opening the condition**. I agree, and I added that behavior.
+
+### What I implemented now
+
+- Added `scripts/ost_condition_style_inspector.py`
+  - Opens the selected condition (double-click row),
+  - OCR-reads the dialog for `Style` (`area`, `linear`, `count`, `attachment`),
+  - closes dialog (`Esc`) and returns structured JSON.
+
+- Wired style inspection into `scripts/ost_left_blank_takeoff_attempt.py`
+  - After condition lock, Maverick now runs style inspection.
+  - Stores:
+    - `condition_style`
+    - `condition_style_inspection`
+  - Uses style to choose behavior:
+    - `area` → polygon-style clicks
+    - `linear` → path-style clicks (single clicks with double-click termination behavior pattern)
+    - `count` → point/count behavior
+
+### Your condition point (critical) is now reflected
+
+You are correct: this should be based on the **condition itself**, not “tool behavior.”  
+The flow is now:
+
+1. Lock condition identity (`ceiling`/`gwb`, row).
+2. Open condition.
+3. Read style.
+4. Close condition.
+5. Execute takeoff using style-specific click logic.
+
+---
+
+### Open-source blueprint symbol datasets to use next
+
+These are strong candidates for training symbol recognition (doors, frames, windows, sinks, toilets, etc.):
+
+- **FloorPlanCAD** (large CAD symbol dataset): [floorplancad.github.io](https://floorplancad.github.io/)
+- **ArchCAD / ArchCAD-400K** (very large architectural symbol corpora): [github.com/ArchiAI-LAB/ArchCAD](https://github.com/ArchiAI-LAB/ArchCAD)
+- **CVC-FP** (rooms/walls/doors/windows annotated): [dag.cvc.uab.es/resources/floorplans](https://dag.cvc.uab.es/resources/floorplans/)
+- **SESYD** (engineering/floorplan symbol spotting benchmark): [mathieu.delalandre.free.fr/projects/sesyd](http://mathieu.delalandre.free.fr/projects/sesyd/)
+
+If you want, next I’ll build a small `symbol_knowledge` ingestion pipeline in `scripts/` so Maverick can start with a local, queryable symbol library (class names, visual signatures, and nearest-neighbor examples) before we attach full model training.
