@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 11:46:14`
+- Updated: `2026-04-03 11:46:44`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1100`
+- Messages: `1104`
 
 ## Conversation
 
@@ -15429,3 +15429,47 @@ $env:GLMOCR_API_KEY="YOUR_NEW_ZAI_KEY"
 ```
 
 Once done, say `retest now` and I’ll run the OCR smoke test to confirm GLM is active.
+
+### 1101. USER
+
+<user_query>
+bc1b243c6ddf42299036f92c701da0ef api key ID for Z.ai
+</user_query>
+
+### 1102. ASSISTANT
+
+Thanks — that looks like a **key ID**, not the full secret, which is safer to share than the full key value.
+
+Still, best practice:
+- Don’t post key IDs publicly either (they can aid targeting).
+- Keep both key ID and key secret private.
+
+If you’ve already rotated and generated a new key, set it locally and I can test immediately:
+
+```powershell
+setx GLMOCR_API_KEY "YOUR_NEW_SECRET_KEY"
+```
+
+Then say `retest now` and I’ll verify GLM OCR is working.
+
+### 1103. USER
+
+<user_query>
+bc1b243c6ddf42299036f92c701da0ef api key ID for Z.ai
+</user_query>
+
+### 1104. ASSISTANT
+
+Thanks — that looks like a **key ID**, not the full secret, which is safer to share than the full key value.
+
+Still, best practice:
+- Don’t post key IDs publicly either (they can aid targeting).
+- Keep both key ID and key secret private.
+
+If you’ve already rotated and generated a new key, set it locally and I can test immediately:
+
+```powershell
+setx GLMOCR_API_KEY "YOUR_NEW_SECRET_KEY"
+```
+
+Then say `retest now` and I’ll verify GLM OCR is working.
