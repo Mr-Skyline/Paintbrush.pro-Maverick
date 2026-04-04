@@ -1,0 +1,9 @@
+opencv-python
+torch
+ultralytics
+pdf2image
+paddleocr
+shapely
+numpy
+pyyaml
+pillow

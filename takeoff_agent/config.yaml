@@ -1,0 +1,19 @@
+preprocess:
+  pdf_dpi: 300
+
+scale:
+  auto_detect: true
+  default_ft_per_px: 0.0208333333  # 1/48 ft per pixel fallback
+
+detection:
+  walls:
+    min_length_px: 30
+    max_line_gap: 8
+    hough_threshold: 80
+  rooms:
+    min_area_px: 2000
+  counts:
+    min_area_px: 20
+
+postprocess:
+  min_confidence: 0.9
