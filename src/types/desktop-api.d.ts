@@ -53,6 +53,35 @@ interface DesktopInvoiceResultsPayload {
   };
 }
 
+interface DesktopDisplayInfo {
+  id: number;
+  isPrimary: boolean;
+  label: string;
+  bounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+type DesktopMonitorPreference = 'primary' | 'secondary' | `id:${number}` | `index:${number}`;
+
+interface DesktopMonitorPreferenceResult {
+  ok: boolean;
+  error?: string;
+  monitorPreference?: string;
+  appliedDisplay?: {
+    id: number;
+    bounds: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+  } | null;
+}
+
 interface DesktopApi {
   pickInvoiceFiles: () => Promise<string[]>;
   pickDbFile: () => Promise<string | null>;
@@ -68,6 +97,19 @@ interface DesktopApi {
   ) => Promise<DesktopDbCreateResult>;
   getResults: (outDir: string) => Promise<DesktopInvoiceResultsPayload>;
   openPath: (targetPath: string) => Promise<boolean>;
+  listDisplays: () => Promise<DesktopDisplayInfo[]>;
+  getMonitorPreference: () => Promise<string>;
+  setMonitorPreference: (
+    preference: DesktopMonitorPreference
+  ) => Promise<DesktopMonitorPreferenceResult>;
+  sendWallControl: (message: {
+    source?: string;
+    type?: string;
+    value?: unknown;
+  }) => Promise<{ ok: boolean; error?: string }>;
+  onWallControl: (
+    handler: (payload: { source?: string; type?: string; value?: unknown }) => void
+  ) => () => void;
 }
 
 interface Window {

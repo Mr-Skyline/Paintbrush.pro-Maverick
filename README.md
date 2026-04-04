@@ -25,10 +25,22 @@ npm install
 npm run dev:desktop
 ```
 
+Run Battleship lab as a dedicated fullscreen desktop app:
+
+```powershell
+npm run dev:desktop:battleship
+```
+
 Production-style desktop launch:
 
 ```powershell
 npm run desktop
+```
+
+Production-style Battleship launch:
+
+```powershell
+npm run desktop:battleship
 ```
 
 Desktop UI includes:

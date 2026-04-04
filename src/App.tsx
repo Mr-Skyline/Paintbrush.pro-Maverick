@@ -20,8 +20,20 @@ export default function App() {
     };
   }, []);
 
-  if (window.desktopApi) {
+  const appMode =
+    new URLSearchParams(window.location.search).get('appMode') ||
+    (window.desktopApi ? 'invoice' : 'web');
+
+  if (window.desktopApi && appMode === 'invoice') {
     return <DesktopInvoiceScreen />;
+  }
+
+  if (appMode === 'battleship') {
+    return (
+      <div className="h-full min-h-screen">
+        <BattleshipLabScreen />
+      </div>
+    );
   }
 
   const screen = useNavigationStore((s) => s.screen);
