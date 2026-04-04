@@ -1,8 +1,8 @@
 # Live Conversation Bridge
 
-- Updated: `2026-04-03 22:28:20`
+- Updated: `2026-04-03 22:29:51`
 - Source: `C:\Users\travi\.cursor\projects\c-Users-travi-OneDrive-Documents-Paintbrush-pro\agent-transcripts\e67a9fa2-082b-4d47-ad1a-6e3f14337db6\e67a9fa2-082b-4d47-ad1a-6e3f14337db6.jsonl`
-- Messages: `1484`
+- Messages: `1485`
 
 ## Conversation
 
@@ -18796,3 +18796,9 @@ Okay, so stupid problem. The program is opening on the wrong screen. It should b
 ### 1484. ASSISTANT
 
 Not a stupid problem at all — that’s a common multi-monitor behavior. I’ll update the desktop launcher logic so when two monitors are connected, it opens on the secondary display by default.
+
+### 1485. USER
+
+<user_query>
+Okay, so stupid problem. The program is opening on the wrong screen. It should be opening On my secondary. When I have two screens set up.
+</user_query>
