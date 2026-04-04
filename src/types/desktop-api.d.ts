@@ -82,6 +82,43 @@ interface DesktopMonitorPreferenceResult {
   } | null;
 }
 
+type WallControlActionType =
+  | 'setPopulation'
+  | 'setGenerationRounds'
+  | 'setSegmentsPerTurn'
+  | 'setMutateSigma'
+  | 'setCalibrationNoisePx'
+  | 'setMonitorPreference'
+  | 'setInteractionPolicy'
+  | 'toggleFullscreen'
+  | 'toggleRunning'
+  | 'step'
+  | 'runRounds'
+  | 'resetReplay'
+  | 'loadWallImage'
+  | 'openFilePicker'
+  | 'saveTrainingTemplate'
+  | 'setEditMode'
+  | 'clearUiZones'
+  | 'doQualification'
+  | 'exportWinners'
+  | 'exportLosers'
+  | 'exportRoundReport';
+
+interface WallControlMessage {
+  source?: string;
+  type?: WallControlActionType | string;
+  value?: unknown;
+  actionId?: string;
+}
+
+interface WallControlStatusMessage {
+  actionId: string;
+  status: 'received' | 'executed' | 'failed';
+  message?: string;
+  type?: string;
+}
+
 interface DesktopApi {
   pickInvoiceFiles: () => Promise<string[]>;
   pickDbFile: () => Promise<string | null>;
@@ -102,13 +139,16 @@ interface DesktopApi {
   setMonitorPreference: (
     preference: DesktopMonitorPreference
   ) => Promise<DesktopMonitorPreferenceResult>;
-  sendWallControl: (message: {
-    source?: string;
-    type?: string;
-    value?: unknown;
-  }) => Promise<{ ok: boolean; error?: string }>;
+  focusControlsWindow: () => Promise<{ ok: boolean; error?: string }>;
+  sendWallControl: (message: WallControlMessage) => Promise<{ ok: boolean; error?: string }>;
+  sendWallState: (snapshot: unknown) => Promise<{ ok: boolean; error?: string }>;
+  sendWallStatus: (status: WallControlStatusMessage) => Promise<{ ok: boolean; error?: string }>;
   onWallControl: (
-    handler: (payload: { source?: string; type?: string; value?: unknown }) => void
+    handler: (payload: WallControlMessage) => void
+  ) => () => void;
+  onWallState: (handler: (payload: unknown) => void) => () => void;
+  onWallStatus: (
+    handler: (payload: WallControlStatusMessage) => void
   ) => () => void;
 }
 

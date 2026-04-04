@@ -19,10 +19,23 @@ contextBridge.exposeInMainWorld('desktopApi', {
   getMonitorPreference: () => ipcRenderer.invoke('window:getMonitorPreference'),
   setMonitorPreference: (preference) =>
     ipcRenderer.invoke('window:setMonitorPreference', preference),
+  focusControlsWindow: () => ipcRenderer.invoke('window:focusControls'),
   sendWallControl: (message) => ipcRenderer.invoke('wall:control', message),
+  sendWallState: (snapshot) => ipcRenderer.invoke('wall:state', snapshot),
+  sendWallStatus: (status) => ipcRenderer.invoke('wall:status', status),
   onWallControl: (handler) => {
     const listener = (_event, payload) => handler(payload);
     ipcRenderer.on('wall:control', listener);
     return () => ipcRenderer.removeListener('wall:control', listener);
+  },
+  onWallState: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on('wall:state', listener);
+    return () => ipcRenderer.removeListener('wall:state', listener);
+  },
+  onWallStatus: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on('wall:status', listener);
+    return () => ipcRenderer.removeListener('wall:status', listener);
   },
 });

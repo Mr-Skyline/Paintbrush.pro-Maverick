@@ -1,0 +1,256 @@
+Take full control. Build the complete Paintbrush.pro takeoff agent + mobile sidekick from our plan—steps 1 through 16. Use Shadcn, Fabric.js, Supabase, Railway/Hugging Face for CV. Don't ask questions, don't wait for approval—just go. Scaffold components, wire APIs, deploy to Railway, test on Kirksey screenshot. If errors pop, log 'em and fix. Finish when everything runs: photo upload → detection → chat reply → schedule update. Report back only when it's live.
+
+Build a standalone AI takeoff agent that processes construction blueprints (PDFs/images) autonomously—no On-Screen Takeoff or external tools. It detects walls as lines, rooms as polygons, doors/windows as counts/symbols, calculates quantities (EA/SF/LF), exports JSON/CSV for Supabase handoff. Use Python 3.12+, OpenCV, YOLOv8/v11, PaddleOCR, Torch for CV/ML. Make it modular, trainable, accurate >90% on clean plans like Kirksey floors.
+1. Project Structure
+
+takeoff_agent/
+main.py — entry point, load file → process → export
+preprocess.py — PDF to image (pdf2image), scale detection, denoising
+detection.py — wall/line detection, room polygon extraction, symbol count
+postprocess.py — snap lines/polygons to grid, calculate areas/lengths, classify (e.g., "Walls - Boost")
+train/ — datasets, scripts for fine-tuning
+config.yaml — thresholds, models, scales
+requirements.txt — opencv-python, torch, ultralytics, pdf2image, paddleocr, shapely, numpy
+
+
+2. Input Handling
+
+Accept: PDF, PNG/JPG, multi-page.
+Convert PDF → high-res images (300 DPI) via pdf2image.
+Auto-detect scale: OCR for "1/8"=1'" text, or assume default; user override via config.
+Denoise: Gaussian blur + adaptive threshold (OpenCV).
+
+3. Core Detection Pipeline (inspired by Togal + Floor-Plan-Detection)
+
+Wall Detection (lines/segments):
+Use YOLOv11 trained on floor plan walls (CubiCasa5k dataset or custom).
+Output: bounding boxes + keypoints for endpoints.
+Merge overlapping lines → skeletonize (OpenCV morphology) → vector paths.
+Classify types: red=exterior, blue=interior via color histogram.
+
+Area Extraction (polygons/rooms):
+Segmentation model (U-Net or SAM2) on walls → room masks.
+Contour detection (OpenCV findContours) → approximate polygons (cv2.approxPolyDP).
+Close shapes: snap angles to 90°/45°, expand by 4" for tolerances (like Togal).
+Calculate SF: shapely Polygon.area * scale factor.
+Ignore <0'3" features (filter noise).
+
+Counts (doors/windows/fixtures):
+YOLO for object detection (doors as symbols).
+Keypoints: hinge/open/close points → orientation (virtual mirror method).
+Count EA: cluster by type (Levenshtein on OCR labels), center-click sim.
+Chain bonus: same-type groups get +points in training.
+
+
+4. Accuracy & Training
+
+Use CubiCasa5k or custom dataset (label 500+ plans: walls, rooms, doors).
+Fine-tune: YOLO for detection, SAM for segmentation.
+Metrics: mAP@0.5 >0.9, polygon IoU >0.92, count accuracy >95%.
+Reward shaping: +12 if area >92% match, -4 if <85%; snap to grid.
+Qualification: simulate button centers—must hit 85% before full run.
+
+5. Output & Handoff
+
+JSON: {"walls": } {"room": "Living", "sf": 628, "polygon": ...]} ], "counts": {"Doors": 5, "Windows": 0}}
+CSV for Supabase: upload to bucket, tag metadata (project_id, scale).
+Error flag: if <90% confidence, retry with manual mode (agent pauses, logs).
+
+6. Deployment
+
+Electron wrapper (your Paintbrush stack): load blueprint → agent runs → display overlays (Fabric.js canvas).
+24/7: queue folder watch (watchdog), multi-thread on GPU.
+Supabase: edge function triggers on upload → agent processes → DB insert.
+
+7. Next Steps for Cursor
+
+Start with preprocess.py + PDF loader.
+Test on Kirksey screenshot: detect 98 walls, polygon rooms.
+Add YOLO training script.
+Integrate shapely for poly math.
+
+8. Post-Deployment & Maintenance
+
+Error Handling & Logging (critical—don't skip):
+Wrap every CV step in try/except: catch OpenCV/YOLO failures (e.g., bad scale, blurry PDF), log to file + Supabase table (project_id, error_type, confidence).
+Auto-retry: if detection <80% conf, downscale image 2x, re-run.
+Fallback: if total fail, flag for human review—push screenshot + log to Supabase "review-queue" bucket.
+From STACK best practices: always let estimator validate—agent outputs "suggested" vs "final" quantities.
+
+UI Overlays & Feedback (make it Togal-like):
+Use Fabric.js (your Paintbrush stack) to draw detections live: red lines for walls, green polys for rooms, yellow dots for doors.
+Add confidence heatmaps—color-code low-conf areas red so agent "sees" misses.
+Interactive mode: agent pauses on <90% accuracy, simulates clicks for tweak (like Togal's confirm button).
+
+Scale & Resolution Tests:
+Test on varying DPI (300-600), scales (1/8"=1', 1/4"=1'), orientations (rotated plans).
+Auto-scale detect: OCR "SCALE" text via PaddleOCR, fallback to grid analysis (Hough lines for grid).
+Multi-page PDFs: process each page, merge quantities (e.g., total walls across sheets).
+
+Supabase Handoff Refinements:
+Use supabase-py: after takeoff, insert row to estimates table—{project_id, walls_ea: 98, ceilings_sf: 0, polygons: jsonb}.
+Upload annotated image (with overlays) to storage: supabase.storage.from_('blueprints').upload(f"{project_id}.png", annotated_img).
+Edge function trigger: on upload → agent runs → DB insert → Tanis's pricing kicks off.
+
+Training Loop & Retraining:
+Save bad detections as "negative" samples—upload to Roboflow dataset (from their floor plan guide).
+Weekly retrain: if accuracy dips (track mAP/IoU), fine-tune YOLO/SAM on new data.
+Use Roboflow Universe: grab their 500+ annotated plans for base—fine-tune on your Kirksey-style ones.
+
+Security & 24/7 Ops:
+Rate-limit uploads (Supabase policies).
+GPU queue: Celery or RQ for parallel jobs—run 10 takeoffs at once on cloud.
+Monitor: Prometheus + Grafana for throughput, error rates.
+
+
+These plug the gaps—errors won't crash it, UI feels pro, scales to your 24/7 vision. From what I dug up, Roboflow's got killer floor-plan datasets and SAM integration for polygons; STACK says human oversight is key.
+
+9. Production Hardening & 2026 Trends
+
+Liability & Governance (from Autodesk experts):
+Add explainability: log every detection decision (YOLO conf scores, polygon vertices) to Supabase table—human can audit "why it counted 98 walls."
+Human-in-loop flag: if <95% accuracy, push annotated image + quantities to review queue (bucket + email alert). No full auto-trust—avoids blame if AI misreads a fuzzy line.
+Traceability: timestamp all outputs with model version, dataset hash—legal shield for estimates.
+
+Auto-Scale & Multi-Format Resilience:
+OCR scale text ("1/8"=1'") with PaddleOCR first—fallback to Hough line grid analysis if missing.
+Handle rotated/angled plans: detect orientation via text alignment or corner detection.
+Multi-page PDFs: merge quantities across sheets (e.g., total walls = sum page1 + page2).
+
+UI Polish (Togal/AI-Takeoffs Style):
+Overlay detections: red lines for walls, green polys for areas, yellow dots for doors—Fabric.js canvas in Paintbrush.
+Confidence map: fade low-conf zones (e.g., blurry text) red—agent "pauses" for tweak if needed.
+Dashboard: show real-time progress, scale selector dropdown, undo/redo for manual fixes—like those AutoMate screenshots with move tools.
+
+Retraining & Continuous Improvement:
+Weekly dataset update: bad runs auto-save as negatives to Roboflow—fine-tune YOLO/SAM on your Kirksey plans.
+Metrics dashboard: track mAP, IoU, count accuracy in Supabase—alert if drops below 92%.
+From 2026 trends: use production data for iteration—agent gets smarter over time, no static model.
+
+Supabase Integration Tweaks:
+Since Edge Functions lack native CV (no YOLO/OCR built-in), run ML externally (e.g., Railway or HuggingFace API)—call from Edge Function via fetch.
+Store raw + annotated images: supabase.storage.from('takeoffs').upload(project_id + '_annotated.png', img).
+Trigger chain: upload → agent → DB insert → Tanis pricing auto-starts.
+
+24/7 Ops Scaling:
+Celery/RQ queue for parallel takeoffs—GPU workers on cloud.
+Monitor: log errors, throughput—Grafana if you want fancy.
+Rate limits: Supabase policies cap uploads to prevent spam.
+
+These make it bulletproof: accurate, auditable, scalable—like the AI painting tools that spit bid-ready Excel in hours.
+
+10. Advanced Features & Monetization
+
+Multi-User & Collaboration: Add real-time co-editing via Supabase Realtime—multiple estimators tweak agent suggestions live.
+Voice/Command Mode: Integrate speech-to-text (Whisper API) for "zoom to kitchen, count doors"—hands-free on site.
+Pricing Add-Ons: Agent auto-suggests upsells (e.g., "Add primer for 98 walls? +$200"). Export bid templates for Paintbrush.
+White-Label: Package as SaaS—charge per takeoff or subscription, integrate with Tanis's pricing for seamless flow.
+
+11. Testing & Rollout
+
+Unit/Integration Tests: Pytest on each module—mock PDFs, assert wall count=98 on Kirksey sample.
+Beta Run: Deploy to 5 real jobs—track accuracy vs manual OST, log deltas.
+A/B: Compare agent vs Togal-style auto-detect on same plans—pick winner for production.
+Compliance: GDPR/HIPAA-lite for client data; audit logs for disputes.
+
+12. Long-Term Evolution
+
+Hybrid AI: Blend rule-based (snap to grid) with ML—fallback if YOLO fails on weird angles.
+Self-Improving: Agent logs every miss, auto-fine-tunes monthly via LoRA on new data.
+Expansion: Add 3D takeoff (from drone photos), material waste calc, or AR overlays for painters.
+Community: Open-source detection models on HuggingFace—crowdsource labels for better accuracy.
+
+These turn it from "cool prototype" to "industry killer"—accurate, auditable, and profitable.
+From fresh searches, 2026's big: AI agents in construction now hit 99% on roofs, dashboards like AI-Takeoffs show overlays just like we want—red lines, auto-areas. Kreo's got that blue/orange room mapping too.
+
+For your takeoff viewer:
+
+Sidebar/Conditions Panel: Use Shadcn's Accordion or Tabs for the left panel—like "Walls - Boost: 98 EA", "Ceilings: 0 SF". Card + Badge for quantities, DataTable for lists.
+Canvas Overlays: Wrap Fabric.js in a resizable div with Shadcn Dialog/Tooltip for zoom, snap, undo. Add HoverCard for confidence popups on detected lines/polygons.
+Dashboard Bits: Progress bars (Progress component) for accuracy, DropdownMenu for mode switch (walls/areas/counts), Button variants for "Run Takeoff" or "Export to Supabase".
+
+13. Shadcn UI Integration
+
+Use Shadcn (shadcn/ui) for all frontend components in Paintbrush.pro—copy-paste React + Tailwind setup, no external deps.
+Install: npx shadcn-ui@latest init then add Accordion, Badge, Button, Card, DataTable, Dialog, DropdownMenu, HoverCard, Progress, Tabs, Tooltip.
+Viewer Layout:
+Left sidebar: Accordion for Conditions/Zones (e.g., "Walls - Boost" header, Badge for "98 EA", DataTable for detailed list).
+Main canvas: resizable div wrapping Fabric.js—add Dialog for zoom/pan controls, Tooltip on overlays (e.g., "Wall: 12 LF, 95% conf").
+Top bar: DropdownMenu for mode switch (walls/areas/counts), Progress bar for accuracy, Button for "Run Takeoff" / "Export".
+Overlays: red lines (walls), green polygons (rooms), yellow dots (doors)—use Fabric.js paths/groups, Shadcn HoverCard for hover info.
+Dark mode: Shadcn's built-in—toggle via theme provider.
+
+Component Tree (quick sketch):
+App → ViewerPage
+Header (Tabs + Button)
+Sidebar (Accordion + Card + Badge)
+CanvasContainer (resizable + Fabric.js + HoverCard)
+Footer (Progress + DropdownMenu)
+
+
+Fabric.js Sync: On agent output, draw detections via Fabric—add undo/redo with Shadcn Button group. Confidence map: opacity/fade low-conf zones.
+Testing: Ensure responsive (mobile-ish for site visits), accessibility (ARIA labels), and no Tailwind conflicts with existing Vite CSS.
+
+This keeps your UI clean, modern, and fast—Shadcn's perfect for Electron
+
+14. Agent Chat Interface
+
+Add a persistent chat window in Paintbrush.pro—side panel or floating dialog, Shadcn-powered.
+Install: npx shadcn-ui@latest add chat (or grab shadcn-chat if available; fallback to custom with Avatar, Input, ScrollArea).
+Layout:
+Sidebar tab: "Agent Chat" (Accordion or Tabs).
+Bubbles: User messages left (blue), agent right (green)—Avatar for agent icon (maybe a little blueprint robot).
+Input bar: TextInput + Send Button; add Mic icon for future voice.
+Typing indicator: Shadcn Skeleton while agent thinks.
+
+Backend Hook:
+On send: IPC to Electron main → agent backend (Node/Python).
+Agent replies: "Detected 98 walls—want me to refine polygons?" or "Missed door? Here's why: low conf 0.72."
+Use Ollama (local LLM) or OpenAI for natural responses—prompt it with: "You're a helpful takeoff assistant. Keep answers short, factual, reference current project."
+
+Features:
+Commands: "run walls", "show counts", "export JSON"—parse with regex/LLM.
+Attachments: Upload blueprint snippet mid-chat → agent analyzes.
+History: Save to Supabase (chat_logs table)—reload on reopen.
+Voice (optional stretch): Whisper.js for input, Web Speech API for output—10-line add-on.
+
+Testing: Send 10 test queries—ensure agent pulls real-time data (e.g., "What's my wall count?"). No lag, no crashes.
+
+This turns your agent from silent tool into convo partner—ask "Why'd you skip that room?" and it logs conf scores, shows overlay.
+
+15. Remote Mobile Estimator & Real-Time Chat Sidekick
+
+Cloud Shift: Host CV pipeline (YOLO/SAM/OCR) on Railway or Vercel serverless API—upload photo/PDF → endpoint returns detections. Supabase for storage, chat logs, schedules.
+PWA Mobile: Convert Paintbrush to Progressive Web App—add manifest.json (icons, name "Paintbrush Estimator"), service worker for offline uploads/queue. Installable on iOS/Android.
+Mobile UI (Shadcn):
+Responsive: Accordion collapses on small screens, touch-friendly canvas (Fabric.js pinch-zoom).
+Chat: Floating bottom bar—Input + Mic (Whisper for voice), Send button. Bubbles: your messages left, agent right (green, avatar icon).
+Photo Upload: Camera button → native file picker → Supabase bucket → agent auto-analyzes (e.g., "Wall: 12' x 8'—add primer?").
+Measurements: Inline form—TextInput for "length: 15ft", "height: 10ft"—agent recalcs quantities live.
+
+Real-Time Interaction:
+Commands: "Add 2 coats to exterior", "Schedule Fri 9AM", "Why low conf on door?"—agent replies with updates, logs, suggestions.
+Schedule: Shadcn Calendar + Button to slot tasks—agent inserts to Supabase schedules table, notifies "No overlap—confirmed."
+Voice: Web Speech API TTS for agent replies, Whisper.js input—hands-free on site.
+
+Flow Example:
+Snap wall photo → upload → agent: "Detected 98 EA, 200 gal needed. Slot Fri?"
+You: "Yes, add detail: high gloss" → agent updates DB, shows preview.
+
+Testing: Simulate mobile—upload from phone, chat 10x, measure input lag <2s. Offline: queue uploads, sync on connect.
+
+16. Create Accounts & Cursor Setup
+
+Required Accounts (free tiers first—sign up now):
+Supabase (supabase.com): Database/storage for blueprints, chats, schedules. Email/GitHub login, create project, grab URL + anon key from Settings > API.
+Railway (railway.app): Serverless CV host—link GitHub, deploy agent API. Free credits (~$5/mo), add project, get token from dashboard.
+Hugging Face (huggingface.co): Inference for YOLO/SAM—signup, generate API token (Settings > Access Tokens). Free for basics.
+Roboflow (roboflow.com): Dataset fine-tuning—free public plan, upload Kirksey images, get API key from dashboard.
+GitHub (github.com): Your repo—already have? If not, create, push code.
+
+Cursor Integration:
+In Cursor settings: add env vars like SUPABASE_URL, SUPABASE_ANON_KEY, RAILWAY_TOKEN, HF_TOKEN, ROBOFLOW_KEY.
+Prompt Cursor: "Use these keys: . Scaffold env file (.env) and supabase-py client init."
+Test: Run supabase.auth.sign_up snippet—confirm login works.
+
+Security: Never commit keys—use .gitignore for .env. Start with local dev, push to Railway later.

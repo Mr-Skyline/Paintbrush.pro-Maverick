@@ -4,6 +4,7 @@ import { NewProjectScreen } from '@/screens/NewProjectScreen';
 import { WorkspaceLayout } from '@/components/WorkspaceLayout';
 import { DesktopInvoiceScreen } from '@/screens/DesktopInvoiceScreen';
 import { BattleshipLabScreen } from '@/screens/BattleshipLabScreen';
+import { WallBattleshipControlsWindow } from '@/components/WallBattleshipControlsWindow';
 import { useEffect } from 'react';
 
 export default function App() {
@@ -34,6 +35,10 @@ export default function App() {
         <BattleshipLabScreen />
       </div>
     );
+  }
+
+  if (appMode === 'battleship-controls') {
+    return <WallBattleshipControlsWindow />;
   }
 
   const screen = useNavigationStore((s) => s.screen);

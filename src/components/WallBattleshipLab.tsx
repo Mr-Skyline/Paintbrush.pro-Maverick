@@ -119,186 +119,6 @@ ${rows || '<div>No rounds yet.</div>'}
 </body></html>`;
 };
 
-const controlsWindowHtml = (opts: {
-  mode: QualificationMode;
-  rounds: number;
-  populationSize: number;
-  winnersPerRound: number;
-  isRunning: boolean;
-  ingestingImage: boolean;
-  mapImageLabel: string;
-  monitorPreference: string;
-  displayOptions: Array<{ value: string; label: string }>;
-  result: TournamentResult | null;
-  interactionPolicy: WallInteractionPolicy;
-  arenaRect: Rect2D;
-  uiZoneCount: number;
-  profileId: string;
-}): string => {
-  const commandBusKey = 'wall-battleship-control-command-v1';
-  const latestRound = opts.result?.rounds[opts.result.rounds.length - 1] ?? null;
-  const resultRows =
-    latestRound?.leaderboard
-      .slice(0, 10)
-      .map(
-        (r) =>
-          `<tr><td>${r.agentId}</td><td>${r.score.toFixed(1)}</td><td>${r.completedWalls}</td><td>${r.segmentsTotal}</td><td>${r.invalidActions ?? 0}</td><td>${r.qualificationPass ? 'pass' : 'fail'}</td></tr>`
-      )
-      .join('') ?? '';
-  const monitorOptions = opts.displayOptions
-    .map(
-      (opt) =>
-        `<option value="${opt.value}" ${opt.value === opts.monitorPreference ? 'selected' : ''}>${opt.label}</option>`
-    )
-    .join('');
-  return `<!doctype html><html><head><meta charset="utf-8"/><title>Wall Battleship Controls</title><style>
-body{font-family:Segoe UI,Arial,sans-serif;background:#020617;color:#e2e8f0;padding:12px;margin:0}
-h1{font-size:16px;margin:0 0 10px}
-h2{font-size:13px;margin:12px 0 6px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-label{font-size:12px;display:flex;flex-direction:column;gap:4px}
-input,select,button{background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:12px}
-button{cursor:pointer}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{border:1px solid #334155;padding:5px;text-align:left}
-thead{background:#1e293b}
-.muted{color:#94a3b8;font-size:11px}
-</style></head><body>
-<h1>Wall Battleship Controls</h1>
-<div id="bridgeStatus" class="muted">Bridge: checking...</div>
-<div class="grid">
-  <label>Mode<select id="mode"><option value="warmup" ${opts.mode === 'warmup' ? 'selected' : ''}>warmup</option><option value="ranked" ${opts.mode === 'ranked' ? 'selected' : ''}>ranked</option></select></label>
-  <label>Rounds<input id="rounds" type="number" min="1" value="${opts.rounds}" /></label>
-  <label>Population<input id="population" type="number" min="4" value="${opts.populationSize}" /></label>
-  <label>Winners<input id="winners" type="number" min="1" value="${opts.winnersPerRound}" /></label>
-  <label style="grid-column:1 / span 2;">Interaction policy
-    <select id="policy">
-      <option value="buttons-only" ${opts.interactionPolicy === 'buttons-only' ? 'selected' : ''}>buttons-only</option>
-      <option value="annotated-ui" ${opts.interactionPolicy === 'annotated-ui' ? 'selected' : ''}>annotated-ui</option>
-      <option value="strict-no-ui" ${opts.interactionPolicy === 'strict-no-ui' ? 'selected' : ''}>strict-no-ui</option>
-    </select>
-  </label>
-  <label style="grid-column:1 / span 2;">Target monitor<select id="monitor">${monitorOptions}</select></label>
-</div>
-<div class="row" style="margin-top:8px">
-  <button id="run">${opts.isRunning ? 'Running...' : 'Run tournament'}</button>
-  <button id="loadMap">${opts.ingestingImage ? 'Parsing...' : 'Load selected image'}</button>
-  <button id="leaderboard">Leaderboard window</button>
-  <button id="fullscreen">Toggle fullscreen</button>
-  <button id="monitorApply">Apply monitor</button>
-</div>
-<div class="row" style="margin-top:8px">
-  <button id="winnersJson">Winners JSON</button>
-  <button id="losersJson">Losers JSON</button>
-  <button id="reportMd">Report MD</button>
-</div>
-<div class="row" style="margin-top:8px">
-  <button id="startArenaEdit">Draw arena (2 clicks)</button>
-  <button id="startZoneEdit">Add UI zone (2 clicks)</button>
-  <button id="clearZones">Clear UI zones</button>
-  <button id="saveTemplate">Save resolution template</button>
-</div>
-<div style="margin-top:10px;border:1px solid #334155;border-radius:8px;padding:8px;">
-  <div style="font-size:12px;margin-bottom:6px;">Wall map image upload</div>
-  <input id="mapFileInput" type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/bmp" />
-  <div id="mapFileName" class="muted" style="margin-top:4px;">Selected file: none</div>
-</div>
-<div class="muted" style="margin-top:8px">Map image: ${opts.mapImageLabel}. Profile: ${opts.profileId || 'none'}. Warm-up gate: 7/10, ranked: 10/10.</div>
-<div class="muted">Arena: x=${Math.round(opts.arenaRect.x)}, y=${Math.round(opts.arenaRect.y)}, w=${Math.round(opts.arenaRect.width)}, h=${Math.round(opts.arenaRect.height)} | UI zones: ${opts.uiZoneCount}</div>
-<h2>Tournament results</h2>
-<div class="muted">Final winners: ${opts.result?.finalWinnerIds.join(', ') || 'none yet'}</div>
-${latestRound ? `<div class="muted">Latest round: ${latestRound.round} | winners: ${latestRound.winners.join(', ') || 'none'}</div>` : '<div class="muted">No rounds yet.</div>'}
-${latestRound ? `<div class="muted">Invalid actions (top): ${latestRound.leaderboard.slice(0,5).map(r=>`${r.agentId}:${r.invalidActions ?? 0}`).join(' | ')}</div>` : ''}
-${latestRound ? `<table><thead><tr><th>Agent</th><th>Score</th><th>Walls</th><th>Segs</th><th>Invalid</th><th>Q</th></tr></thead><tbody>${resultRows}</tbody></table>` : ''}
-<script>
-(()=>{
-const commandBusKey='${commandBusKey}';
-const send=(type,payload={})=>{
-  const msg = {source:'wall-controls',type,value:payload.value};
-  try {
-    localStorage.setItem(commandBusKey, JSON.stringify({...msg, ts: Date.now()}));
-  } catch {}
-  try {
-    if (window.desktopApi && typeof window.desktopApi.sendWallControl === 'function') {
-      window.desktopApi.sendWallControl(msg);
-    }
-  } catch {}
-  try {
-    if (window.BroadcastChannel) {
-      const bc = new BroadcastChannel('wall-battleship-controls');
-      bc.postMessage(msg);
-      bc.close();
-    }
-  } catch {}
-  try {
-    if (window.opener) {
-      const bridge = window.opener.__wallBattleshipControlBridge;
-      if (bridge && typeof bridge[type] === 'function') {
-        bridge[type](payload.value);
-      } else {
-        window.opener.postMessage({source:'wall-controls',type,...payload},'*');
-      }
-    }
-  } catch {}
-};
-const byId=(id)=>document.getElementById(id);
-const on=(id,evt,fn)=>{ const el = byId(id); if (el) el.addEventListener(evt,fn); };
-const statusEl = byId('bridgeStatus');
-if (statusEl) {
-  const hasDesktopApi = !!(window.desktopApi && typeof window.desktopApi.sendWallControl === 'function');
-  const hasOpener = !!window.opener;
-  statusEl.textContent = 'Bridge: desktopApi=' + (hasDesktopApi ? 'yes' : 'no') + ', opener=' + (hasOpener ? 'yes' : 'no');
-}
-on('mode','change',(e)=>send('setMode',{value:e.target.value}));
-on('rounds','change',(e)=>send('setRounds',{value:Number(e.target.value)}));
-on('population','change',(e)=>send('setPopulation',{value:Number(e.target.value)}));
-on('winners','change',(e)=>send('setWinners',{value:Number(e.target.value)}));
-on('policy','change',(e)=>send('setPolicy',{value:e.target.value}));
-on('monitor','change',(e)=>send('setMonitorPref',{value:e.target.value}));
-on('run','click',()=>send('run'));
-on('loadMap','click',()=>{
-  const input = byId('mapFileInput');
-  const f = input && input.files && input.files[0];
-  if (!f) {
-    alert('Choose an image file in "Wall map image upload" first.');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    send('loadMapDataUrl',{value:{dataUrl:String(reader.result||''),fileName:f.name}});
-  };
-  reader.onerror = ()=>alert('Could not read image file.');
-  reader.readAsDataURL(f);
-});
-on('mapFileInput','change',()=>{
-  const input = byId('mapFileInput');
-  const f = input && input.files && input.files[0];
-  const nameEl = byId('mapFileName');
-  if (nameEl) nameEl.textContent = f ? ('Selected file: ' + f.name) : 'Selected file: none';
-  if (!f) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    send('loadMapDataUrl',{value:{dataUrl:String(reader.result||''),fileName:f.name}});
-  };
-  reader.onerror = ()=>alert('Could not read image file.');
-  reader.readAsDataURL(f);
-});
-on('leaderboard','click',()=>send('leaderboard'));
-on('fullscreen','click',()=>send('fullscreen'));
-on('monitorApply','click',()=>send('applyMonitor'));
-on('winnersJson','click',()=>send('winnersJson'));
-on('losersJson','click',()=>send('losersJson'));
-on('reportMd','click',()=>send('reportMd'));
-on('startArenaEdit','click',()=>send('startArenaEdit'));
-on('startZoneEdit','click',()=>send('startZoneEdit'));
-on('clearZones','click',()=>send('clearZones'));
-on('saveTemplate','click',()=>send('saveTemplate'));
-})();
-</script>
-</body></html>`;
-};
-
 const loadImageData = async (
   src: string
 ): Promise<{ width: number; height: number; data: Uint8ClampedArray }> =>
@@ -565,7 +385,6 @@ export function WallBattleshipLab() {
   const fullscreenContainerRef = useRef<HTMLDivElement | null>(null);
   const replaySurfaceRef = useRef<HTMLDivElement | null>(null);
   const leaderboardWinRef = useRef<Window | null>(null);
-  const controlsWinRef = useRef<Window | null>(null);
   const mapImageInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -625,9 +444,6 @@ export function WallBattleshipLab() {
     return () => {
       if (leaderboardWinRef.current && !leaderboardWinRef.current.closed) {
         leaderboardWinRef.current.close();
-      }
-      if (controlsWinRef.current && !controlsWinRef.current.closed) {
-        controlsWinRef.current.close();
       }
     };
   }, []);
@@ -872,23 +688,43 @@ export function WallBattleshipLab() {
     }
   };
 
+  const publishActionStatus = (status: {
+    actionId: string;
+    status: 'received' | 'executed' | 'failed';
+    message?: string;
+    type?: string;
+  }): void => {
+    if (!window.desktopApi?.sendWallStatus) return;
+    void window.desktopApi.sendWallStatus(status);
+  };
+
   const dispatchControlsAction = (data: {
     source?: string;
     type?: string;
     value?: unknown;
+    actionId?: string;
   }): void => {
     if (!data || data.source !== 'wall-controls') return;
-    switch (data.type) {
+    const actionId = typeof data.actionId === 'string' ? data.actionId : '';
+    if (actionId) publishActionStatus({ actionId, status: 'received', type: data.type });
+    try {
+      switch (data.type) {
       case 'setMode':
-        setMode((data.value as QualificationMode) ?? 'warmup');
+        if (data.value !== 'warmup' && data.value !== 'ranked') {
+          throw new Error('Mode must be warmup or ranked.');
+        }
+        setMode(data.value as QualificationMode);
         break;
       case 'setRounds':
+        if (!Number.isFinite(Number(data.value))) throw new Error('Rounds must be numeric.');
         setRounds(Math.max(1, Number(data.value) || 1));
         break;
       case 'setPopulation':
+        if (!Number.isFinite(Number(data.value))) throw new Error('Population must be numeric.');
         setPopulationSize(Math.max(4, Number(data.value) || 4));
         break;
       case 'setWinners':
+        if (!Number.isFinite(Number(data.value))) throw new Error('Winners must be numeric.');
         setWinnersPerRound(Math.max(1, Number(data.value) || 1));
         break;
       case 'setMonitorPref':
@@ -982,196 +818,31 @@ export function WallBattleshipLab() {
         }
         break;
       default:
-        break;
+        throw new Error(`Unknown control action: ${String(data.type)}`);
+      }
+      if (actionId) publishActionStatus({ actionId, status: 'executed', type: data.type });
+    } catch (error) {
+      if (actionId) {
+        publishActionStatus({
+          actionId,
+          status: 'failed',
+          type: data.type,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   };
 
   const openOrRefreshControlsWindow = (): void => {
     if (!useDetachedControls) return;
-    const hadWindow = !!controlsWinRef.current && !controlsWinRef.current.closed;
-    if (!hadWindow) {
-      controlsWinRef.current = window.open(
-        '',
-        'wall-battleship-controls',
-        'width=540,height=900,resizable=yes,scrollbars=yes'
-      );
-    }
-    if (!controlsWinRef.current) return;
-    try {
-      (
-        controlsWinRef.current as Window & {
-          desktopApi?: Window['desktopApi'];
-          __wallBattleshipControlBridge?: unknown;
-        }
-      ).desktopApi = window.desktopApi;
-      (
-        controlsWinRef.current as Window & {
-          desktopApi?: Window['desktopApi'];
-          __wallBattleshipControlBridge?: unknown;
-        }
-      ).__wallBattleshipControlBridge = (
-        window as Window & { __wallBattleshipControlBridge?: unknown }
-      ).__wallBattleshipControlBridge;
-    } catch {
-      // Ignore cross-context assignment issues; other channels may still work.
-    }
-    controlsWinRef.current.document.open();
-    controlsWinRef.current.document.write(
-      controlsWindowHtml({
-        mode,
-        rounds,
-        populationSize,
-        winnersPerRound,
-        isRunning,
-        ingestingImage,
-        mapImageLabel,
-        monitorPreference,
-        displayOptions,
-        result,
-        interactionPolicy,
-        arenaRect,
-        uiZoneCount: uiClickableZones.length,
-        profileId: trainingProfile?.profileId ?? '',
-      })
-    );
-    controlsWinRef.current.document.close();
-    if (!hadWindow) controlsWinRef.current.focus();
+    if (!window.desktopApi?.focusControlsWindow) return;
+    void window.desktopApi.focusControlsWindow();
   };
 
   useEffect(() => {
     if (!useDetachedControls) return;
     openOrRefreshControlsWindow();
-  }, [
-    useDetachedControls,
-    mode,
-    rounds,
-    populationSize,
-    winnersPerRound,
-    isRunning,
-    ingestingImage,
-    mapImageLabel,
-    monitorPreference,
-    displayOptions,
-    result,
-    interactionPolicy,
-    arenaRect,
-    uiClickableZones,
-    trainingProfile,
-  ]);
-
-  useEffect(() => {
-    const bridge = {
-      setMode: (value: string) => setMode((value as QualificationMode) ?? 'warmup'),
-      setRounds: (value: number) => setRounds(Math.max(1, Number(value) || 1)),
-      setPopulation: (value: number) => setPopulationSize(Math.max(4, Number(value) || 4)),
-      setWinners: (value: number) => setWinnersPerRound(Math.max(1, Number(value) || 1)),
-      setPolicy: (value: string) => {
-        if (value === 'buttons-only' || value === 'annotated-ui' || value === 'strict-no-ui') {
-          setInteractionPolicy(value);
-          persistTrainingProfile({ interactionPolicy: value });
-        }
-      },
-      setMonitorPref: (value: string) => {
-        if (
-          value === 'primary' ||
-          value === 'secondary' ||
-          (typeof value === 'string' && /^id:\d+$/.test(value))
-        ) {
-          setMonitorPreference(value as `id:${number}` | 'primary' | 'secondary');
-        }
-      },
-      run: () => {
-        void runTournament();
-      },
-      loadMap: () => mapImageInputRef.current?.click(),
-      loadMapDataUrl: (value: unknown) => {
-        const payload = value as { dataUrl?: string; fileName?: string } | undefined;
-        const dataUrl = String(payload?.dataUrl || '').trim();
-        if (!dataUrl) return;
-        void parseAndSetMapImage(dataUrl, payload?.fileName || 'controls-window-image');
-      },
-      leaderboard: () => openOrRefreshLeaderboard(),
-      fullscreen: () => {
-        void toggleReplayFullscreen();
-      },
-      applyMonitor: () => {
-        void applyMonitorTarget();
-      },
-      winnersJson: () => {
-        if (!result) return;
-        downloadText(
-          `wall_battleship_winners_${Date.now()}.json`,
-          JSON.stringify(result.winnersArtifact, null, 2),
-          'application/json'
-        );
-      },
-      losersJson: () => {
-        if (!result) return;
-        downloadText(
-          `wall_battleship_losers_${Date.now()}.json`,
-          JSON.stringify(result.losersArtifact, null, 2),
-          'application/json'
-        );
-      },
-      reportMd: () => {
-        if (!reportMd) return;
-        downloadText(`wall_battleship_report_${Date.now()}.md`, reportMd, 'text/markdown');
-      },
-      startArenaEdit: () => {
-        setEditMode('arena');
-        setPendingRectStart(null);
-      },
-      startZoneEdit: () => {
-        setEditMode('zone');
-        setPendingRectStart(null);
-      },
-      clearZones: () => {
-        setUiClickableZones([]);
-        persistTrainingProfile({ uiClickableZones: [] });
-      },
-      saveTemplate: () => {
-        if (!trainingProfile) return;
-        saveTrainingTemplateForResolution({
-          ...trainingProfile,
-          interactionPolicy,
-          arenaRect,
-          uiClickableZones,
-          buttonTargets,
-        });
-      },
-    };
-    (window as Window & { __wallBattleshipControlBridge?: typeof bridge }).__wallBattleshipControlBridge =
-      bridge;
-    return () => {
-      delete (window as Window & { __wallBattleshipControlBridge?: typeof bridge })
-        .__wallBattleshipControlBridge;
-    };
-  }, [
-    result,
-    reportMd,
-    runTournament,
-    applyMonitorTarget,
-    trainingProfile,
-    interactionPolicy,
-    arenaRect,
-    uiClickableZones,
-    buttonTargets,
-  ]);
-
-  useEffect(() => {
-    const onMessage = (evt: MessageEvent) => {
-      const data = evt.data as
-        | {
-            source?: string;
-            type?: string;
-            value?: unknown;
-          }
-        | undefined;
-      dispatchControlsAction(data ?? {});
-    };
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [dispatchControlsAction]);
+  }, [useDetachedControls]);
 
   useEffect(() => {
     const desktopApi = window.desktopApi;
@@ -1183,33 +854,55 @@ export function WallBattleshipLab() {
   }, [dispatchControlsAction]);
 
   useEffect(() => {
-    if (!window.BroadcastChannel) return;
-    const bc = new BroadcastChannel('wall-battleship-controls');
-    bc.onmessage = (evt) => {
-      const payload = evt.data as { source?: string; type?: string; value?: unknown } | undefined;
-      dispatchControlsAction(payload ?? {});
-    };
-    return () => bc.close();
-  }, [dispatchControlsAction]);
-
-  useEffect(() => {
-    const key = 'wall-battleship-control-command-v1';
-    const onStorage = (evt: StorageEvent) => {
-      if (evt.key !== key || !evt.newValue) return;
-      try {
-        const payload = JSON.parse(evt.newValue) as {
-          source?: string;
-          type?: string;
-          value?: unknown;
-        };
-        dispatchControlsAction(payload ?? {});
-      } catch {
-        // Ignore malformed payloads.
-      }
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, [dispatchControlsAction]);
+    const desktopApi = window.desktopApi;
+    if (!desktopApi?.sendWallState) return;
+    const latestRound = result?.rounds[result.rounds.length - 1] ?? null;
+    void desktopApi.sendWallState({
+      mode,
+      rounds,
+      populationSize,
+      winnersPerRound,
+      isRunning,
+      ingestingImage,
+      mapImageLabel,
+      monitorPreference,
+      displayOptions,
+      interactionPolicy,
+      arenaRect,
+      uiZoneCount: uiClickableZones.length,
+      profileId: trainingProfile?.profileId ?? '',
+      finalWinners: result?.finalWinnerIds ?? [],
+      latestRound: latestRound
+        ? {
+            round: latestRound.round,
+            winners: latestRound.winners,
+            leaderboard: latestRound.leaderboard.map((row) => ({
+              agentId: row.agentId,
+              score: row.score,
+              completedWalls: row.completedWalls,
+              segmentsTotal: row.segmentsTotal,
+              invalidActions: row.invalidActions ?? 0,
+              qualificationPass: row.qualificationPass,
+            })),
+          }
+        : null,
+    });
+  }, [
+    mode,
+    rounds,
+    populationSize,
+    winnersPerRound,
+    isRunning,
+    ingestingImage,
+    mapImageLabel,
+    monitorPreference,
+    displayOptions,
+    interactionPolicy,
+    arenaRect,
+    uiClickableZones,
+    trainingProfile,
+    result,
+  ]);
 
   const openOrRefreshLeaderboard = (): void => {
     if (!result) return;
@@ -1249,6 +942,22 @@ export function WallBattleshipLab() {
         className="relative rounded-xl border border-slate-800 bg-slate-900/40 p-3"
         style={replayFullscreen ? { width: '100vw', height: '100vh', padding: '8px' } : undefined}
       >
+        <input
+          ref={mapImageInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/bmp"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            try {
+              const src = await readDataUrlFile(file);
+              await parseAndSetMapImage(src, file.name);
+            } finally {
+              e.currentTarget.value = '';
+            }
+          }}
+        />
         {!useDetachedControls && (
           <div
             className="absolute z-20 rounded-xl border border-slate-700 bg-slate-950/95 p-3 shadow-2xl"
@@ -1381,22 +1090,6 @@ export function WallBattleshipLab() {
             >
               {ingestingImage ? 'Parsing…' : 'Load wall image'}
             </button>
-            <input
-              ref={mapImageInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/bmp"
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                try {
-                  const src = await readDataUrlFile(file);
-                  await parseAndSetMapImage(src, file.name);
-                } finally {
-                  e.currentTarget.value = '';
-                }
-              }}
-            />
             <button
               type="button"
               onClick={runTournament}

@@ -31,6 +31,7 @@ if (isDev) {
 const WINDOW_PREFS_PATH = path.join(app.getPath('userData'), 'window-preferences.json');
 const DEFAULT_MONITOR_PREFERENCE = APP_MODE === 'battleship' ? 'secondary' : 'primary';
 let replayWindow = null;
+let controlsWindow = null;
 
 function isValidMonitorPreference(value) {
   if (value === 'primary' || value === 'secondary') return true;
@@ -136,6 +137,10 @@ function applyWindowToMonitorPreference(win, preference) {
   };
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 function createWindow() {
   const monitorPreference = getMonitorPreference();
   const targetDisplay = resolveTargetDisplay(monitorPreference);
@@ -197,6 +202,45 @@ function createWindow() {
       replayWindow = null;
     }
   });
+}
+
+function createControlsWindow() {
+  if (controlsWindow && !controlsWindow.isDestroyed()) {
+    return controlsWindow;
+  }
+  const primary = screen.getPrimaryDisplay();
+  const work = primary.workArea ?? primary.bounds;
+  const win = new BrowserWindow({
+    width: 560,
+    height: 940,
+    minWidth: 460,
+    minHeight: 700,
+    x: work.x + Math.max(10, work.width - 590),
+    y: work.y + 40,
+    show: true,
+    backgroundColor: '#020617',
+    autoHideMenuBar: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  controlsWindow = win;
+  if (USE_DEV_SERVER) {
+    win.loadURL(`${DEV_RENDERER_URL}?appMode=battleship-controls`);
+  } else {
+    win.loadFile(path.join(ROOT_DIR, 'dist', 'index.html'), {
+      query: { appMode: 'battleship-controls' },
+    });
+  }
+  win.on('closed', () => {
+    if (controlsWindow === win) {
+      controlsWindow = null;
+    }
+  });
+  return win;
 }
 
 async function pickFiles() {
@@ -455,15 +499,49 @@ ipcMain.handle('window:setMonitorPreference', (_event, preference) => {
     ...prefs,
     monitorPreference: next,
   });
-  const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
+  const win =
+    (APP_MODE === 'battleship' ? replayWindow : null) ??
+    BrowserWindow.getFocusedWindow() ??
+    BrowserWindow.getAllWindows()[0] ??
+    null;
   const appliedDisplay = win ? applyWindowToMonitorPreference(win, next) : null;
   return { ok: true, monitorPreference: next, appliedDisplay };
 });
 ipcMain.handle('wall:control', (_event, message) => {
+  if (!isPlainObject(message) || String(message.source || '') !== 'wall-controls') {
+    return { ok: false, error: 'Invalid wall control payload.' };
+  }
   if (!replayWindow || replayWindow.isDestroyed()) {
     return { ok: false, error: 'Replay window unavailable.' };
   }
   replayWindow.webContents.send('wall:control', message);
+  return { ok: true };
+});
+ipcMain.handle('wall:state', (_event, snapshot) => {
+  if (!isPlainObject(snapshot)) {
+    return { ok: false, error: 'Invalid wall state payload.' };
+  }
+  if (!controlsWindow || controlsWindow.isDestroyed()) {
+    return { ok: false, error: 'Controls window unavailable.' };
+  }
+  controlsWindow.webContents.send('wall:state', snapshot);
+  return { ok: true };
+});
+ipcMain.handle('wall:status', (_event, status) => {
+  if (!isPlainObject(status) || typeof status.actionId !== 'string') {
+    return { ok: false, error: 'Invalid wall status payload.' };
+  }
+  if (!controlsWindow || controlsWindow.isDestroyed()) {
+    return { ok: false, error: 'Controls window unavailable.' };
+  }
+  controlsWindow.webContents.send('wall:status', status);
+  return { ok: true };
+});
+ipcMain.handle('window:focusControls', () => {
+  const win = createControlsWindow();
+  if (!win) return { ok: false, error: 'Could not open controls window.' };
+  if (win.isMinimized()) win.restore();
+  win.focus();
   return { ok: true };
 });
 
@@ -482,8 +560,14 @@ app.whenReady().then(() => {
     });
   });
   createWindow();
+  if (APP_MODE === 'battleship') {
+    createControlsWindow();
+  }
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+      if (APP_MODE === 'battleship') createControlsWindow();
+    }
   });
 });
 

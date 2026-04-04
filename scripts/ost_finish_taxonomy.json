@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "focus": "interior_exterior_architectural_finishes",
+  "trades": {
+    "painting": {
+      "aliases": ["paint", "pt", "coating", "repaint"],
+      "subtypes": ["interior_paint", "exterior_paint", "accent_paint", "specialty_coating"]
+    },
+    "wallcovering": {
+      "aliases": ["wall_covering", "wallcover", "wc", "vinyl_wallcovering"],
+      "subtypes": ["vinyl_wallcovering", "fabric_wallcovering", "acoustic_wall_panel"]
+    },
+    "drywall": {
+      "aliases": ["gwb", "gypsum", "wallboard", "board"],
+      "subtypes": ["new_gwb", "patch_gwb", "level5_finish", "fire_rated_partition"]
+    },
+    "doors": {
+      "aliases": ["door", "dr"],
+      "subtypes": ["single_door", "double_door", "glass_door", "rated_door"]
+    },
+    "door_frames": {
+      "aliases": ["frame", "door_frame", "hm_frame", "jamb"],
+      "subtypes": ["hollow_metal_frame", "wood_frame", "borrowed_lite_frame"]
+    },
+    "trim": {
+      "aliases": ["trim", "casing", "chair_rail", "crown"],
+      "subtypes": ["wood_trim", "metal_trim", "pvc_trim"]
+    },
+    "wood_base": {
+      "aliases": ["base", "baseboard", "wb", "wood_base"],
+      "subtypes": ["rubber_base", "wood_base", "resilient_base"]
+    },
+    "ceilings": {
+      "aliases": ["ceiling", "clg", "rcp", "act", "acoustical"],
+      "subtypes": ["acoustical_ceiling", "gwb_ceiling", "exposed_deck", "soffit", "cloud"]
+    }
+  },
+  "height_notation_patterns": [
+    "AFF",
+    "A.F.F.",
+    "CLG",
+    "CEILING",
+    "TYP",
+    "VARIES",
+    "ELEV",
+    "EL."
+  ],
+  "design_set_signatures": {
+    "autocad_like": ["A-", "A_", "XREF", "LAYER", "CTB", "STB"],
+    "revit_like": ["LEVEL", "SHEET", "VIEW", "DETAIL", "ROOM TAG"],
+    "vectorworks_like": ["CLASS", "DESIGN LAYER", "SHEET LAYER"]
+  }
+}
+
