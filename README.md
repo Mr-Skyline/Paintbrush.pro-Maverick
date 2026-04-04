@@ -15,6 +15,27 @@ npm run dev
 - Vite: **http://localhost:5173**
 - API / Socket.IO: **http://localhost:3000** (proxied from Vite)
 
+### CV Service (standalone Python)
+
+The repo now includes a standalone CV API in `takeoff_agent/`.
+
+```powershell
+cd "C:\Users\travi\OneDrive\Documents\Paintbrush.pro\takeoff_agent"
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+```
+
+- CV API health: **http://localhost:8000/health**
+- Main endpoint: `POST /api/v1/takeoff/process`
+
+Set app server `.env`:
+
+```text
+TAKEOFF_CV_API_URL=http://localhost:8000
+```
+
 ## Desktop App (Electron)
 
 Run a clean desktop UI for invoice review:
@@ -65,7 +86,7 @@ Desktop UI includes:
 
 ## Env (server)
 
-See `.env.example`: `ELEVENLABS_*`, `GROK_API_KEY` (xAI).
+See `.env.example`: `ELEVENLABS_*`, `GROK_API_KEY` (xAI), `TAKEOFF_CV_API_URL`, and Supabase keys.
 
 Voice uses **`POST /api/agent/step`**: Grok receives tools (`boost_run`, `boost_apply_review`, conditions, canvas, save, etc.); the browser executes tool results in a loop until the model replies in plain text. Requires a model/key that supports OpenAI-style function calling on the xAI API.
 
@@ -155,3 +176,39 @@ Notes:
 ## Legacy
 
 Old static files under `public/` are unused by the React app.
+
+## Mobile Sidekick / PWA
+
+- Manifest: `public/manifest.webmanifest`
+- Service worker: `public/sw.js`
+- Mobile mode URL: `/?appMode=sidekick`
+- Install flow: open app in mobile browser -> menu -> **Add to Home Screen**
+
+## Railway Deployment (CV Service)
+
+1. Deploy `takeoff_agent/` as a Railway service (Dockerfile included).
+2. Railway root for that service: `takeoff_agent`.
+3. Set service env vars as needed (`PORT`, model tokens).
+4. Copy Railway URL and set app server:
+
+```text
+TAKEOFF_CV_API_URL=https://<your-railway-service>.up.railway.app
+```
+
+Health check:
+
+```bash
+curl https://<your-railway-service>.up.railway.app/health
+```
+
+## Supabase Schema Setup
+
+Run SQL in Supabase SQL editor:
+
+- `supabase/schema_takeoff.sql`
+
+## Kirksey / Smoke Test
+
+```powershell
+python "scripts/test_takeoff_flow.py" --api "http://localhost:8000" --project-id "kirksey-demo" --file "C:\path\to\Kirksey.png"
+```

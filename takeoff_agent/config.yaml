@@ -1,0 +1,7 @@
+pixels_per_foot_default: 48
+scale_label_default: "1/8\" = 1'-0\""
+manual_review_threshold: 0.9
+hough_threshold: 80
+min_line_length_px: 60
+max_line_gap_px: 10
+min_room_area_px: 2200

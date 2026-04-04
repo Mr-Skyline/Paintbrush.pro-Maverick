@@ -5,6 +5,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import { AGENT_TOOLS } from './agentTools.mjs';
+import multer from 'multer';
+import { processBlueprintWithCv } from './takeoffCvProxy.mjs';
+import {
+  saveSidekickChat,
+  saveTakeoffResult,
+  upsertScheduleEvent,
+} from './supabaseGateway.mjs';
+import { enqueueReview, logDecision } from './auditLog.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -16,6 +24,7 @@ const DIST = path.join(__dirname, '..', 'dist');
 const isProd = process.env.NODE_ENV === 'production';
 
 app.use(express.json({ limit: '4mb' }));
+const upload = multer({ limits: { fileSize: 25 * 1024 * 1024 } });
 
 app.post('/api/tts', async (req, res) => {
   const key = process.env.ELEVENLABS_API_KEY;
@@ -178,6 +187,139 @@ app.post('/api/agent/step', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: String(e.message || e), message: null });
   }
+});
+
+app.get('/api/takeoff/health', (_req, res) => {
+  res.json({
+    ok: true,
+    cvApi: process.env.TAKEOFF_CV_API_URL ? 'configured' : 'mock',
+    supabase: process.env.SUPABASE_URL ? 'configured' : 'not-configured',
+  });
+});
+
+app.post('/api/takeoff/process-upload', upload.single('file'), async (req, res) => {
+  try {
+    const projectId = String(req.body.projectId || 'local-project').trim();
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'Missing file upload' });
+      return;
+    }
+    const result = await processBlueprintWithCv({
+      projectId,
+      sourceName: file.originalname,
+      mimeType: file.mimetype,
+      fileBuffer: file.buffer,
+    });
+    logDecision('takeoff_processed', {
+      projectId,
+      sourceName: file.originalname,
+      confidence: result.confidence,
+      walls: result.walls?.length ?? 0,
+      rooms: result.rooms?.length ?? 0,
+      auditId: result.auditId ?? null,
+    });
+    if ((result.confidence ?? 0) < 0.9 || result.needsReview) {
+      enqueueReview({
+        projectId,
+        sourceName: file.originalname,
+        confidence: result.confidence ?? 0,
+        reason: 'low_confidence',
+        result,
+      });
+    }
+    const save = await saveTakeoffResult(result);
+    res.json({
+      ...result,
+      persisted: save.ok,
+      persistenceError: save.error,
+    });
+  } catch (error) {
+    logDecision('takeoff_error', {
+      error: String(error?.message || error),
+      endpoint: '/api/takeoff/process-upload',
+    });
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post('/api/sidekick/chat', async (req, res) => {
+  const projectId = String(req.body?.projectId || 'local-project').trim();
+  const userText = String(req.body?.message || '').trim();
+  if (!userText) {
+    res.status(400).json({ error: 'Missing message' });
+    return;
+  }
+
+  const key = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+  let reply = '';
+  if (key) {
+    try {
+      const model = process.env.GROK_MODEL || 'grok-2-latest';
+      const upstream = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are Paintbrush Sidekick. Keep answers concise, practical, and grounded in latest takeoff run context.',
+            },
+            { role: 'user', content: userText },
+          ],
+          temperature: 0.25,
+          max_tokens: 500,
+        }),
+      });
+      const data = await upstream.json();
+      if (!upstream.ok) {
+        throw new Error(data?.error?.message || JSON.stringify(data));
+      }
+      reply = String(data?.choices?.[0]?.message?.content || '').trim();
+    } catch (error) {
+      reply = `Sidekick fallback: ${String(error?.message || error)}`;
+    }
+  } else {
+    reply =
+      'Sidekick is running in local fallback mode (no GROK key). Detection completed and schedule can still be updated.';
+  }
+  await saveSidekickChat(projectId, userText, reply);
+  logDecision('chat_reply', { projectId, userText, reply });
+  res.json({ reply });
+});
+
+app.post('/api/schedule/upsert', async (req, res) => {
+  const projectId = String(req.body?.projectId || '').trim();
+  const title = String(req.body?.title || '').trim();
+  const startsAtIso = String(req.body?.startsAtIso || '').trim();
+  const notes = String(req.body?.notes || '').trim();
+  if (!projectId || !title || !startsAtIso) {
+    res.status(400).json({ error: 'projectId, title, startsAtIso are required' });
+    return;
+  }
+  const out = await upsertScheduleEvent({
+    projectId,
+    title,
+    startsAtIso,
+    notes,
+  });
+  if (!out.ok && !out.skipped) {
+    res.status(500).json({ error: out.error || 'Could not persist schedule' });
+    return;
+  }
+  logDecision('schedule_upsert', {
+    projectId,
+    title,
+    startsAtIso,
+    saved: out.ok,
+    skipped: Boolean(out.skipped),
+  });
+  res.json({ ok: true });
 });
 
 io.on('connection', (socket) => {

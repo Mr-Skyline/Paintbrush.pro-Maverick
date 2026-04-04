@@ -1,0 +1,24 @@
+{
+  "requiredEnv": [
+    "PORT",
+    "GROK_API_KEY",
+    "TAKEOFF_CV_API_URL",
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY"
+  ],
+  "services": {
+    "frontend": {
+      "command": "npm run dev:client",
+      "port": 5173
+    },
+    "api": {
+      "command": "npm run dev:server",
+      "port": 3000
+    },
+    "cv": {
+      "command": "python takeoff_agent/main.py",
+      "port": 8000
+    }
+  }
+}

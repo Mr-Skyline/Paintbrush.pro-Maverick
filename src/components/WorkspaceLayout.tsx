@@ -6,6 +6,7 @@ import { SidebarLeft } from '@/components/SidebarLeft';
 import { StatusBar } from '@/components/StatusBar';
 import { ToolbarOST } from '@/components/ToolbarOST';
 import { VoiceControls } from '@/components/VoiceControls';
+import { TakeoffSidekickPanel } from '@/components/TakeoffSidekickPanel';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { loadPdfBlob, savePdfBlob } from '@/lib/indexedProjectDb';
 import { buildOstProjectFile } from '@/lib/serializeOst';
@@ -286,6 +287,7 @@ export function WorkspaceLayout() {
             <CanvasWorkspace pdfData={pdfData} />
           </div>
           <VoiceControls />
+          <TakeoffSidekickPanel />
         </main>
         <RightSidebarProperties />
       </div>

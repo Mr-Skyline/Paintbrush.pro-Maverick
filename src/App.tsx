@@ -5,6 +5,7 @@ import { WorkspaceLayout } from '@/components/WorkspaceLayout';
 import { DesktopInvoiceScreen } from '@/screens/DesktopInvoiceScreen';
 import { BattleshipLabScreen } from '@/screens/BattleshipLabScreen';
 import { WallBattleshipControlsWindow } from '@/components/WallBattleshipControlsWindow';
+import { MobileSidekickScreen } from '@/screens/MobileSidekickScreen';
 import { useEffect } from 'react';
 
 export default function App() {
@@ -39,6 +40,10 @@ export default function App() {
 
   if (appMode === 'battleship-controls') {
     return <WallBattleshipControlsWindow />;
+  }
+
+  if (appMode === 'sidekick') {
+    return <MobileSidekickScreen />;
   }
 
   const screen = useNavigationStore((s) => s.screen);
