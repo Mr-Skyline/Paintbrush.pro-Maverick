@@ -51,7 +51,11 @@ def _estimate_scale_from_text(image_bgr: np.ndarray, default_ft_per_px: float) -
     except Exception:
         return default_ft_per_px
 
-    ocr = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
+    # PaddleOCR constructor args vary across versions; keep this path best-effort only.
+    try:
+        ocr = PaddleOCR(use_angle_cls=True, lang="en")
+    except Exception:
+        return default_ft_per_px
     rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     lines = ocr.ocr(rgb, cls=True) or []
 
