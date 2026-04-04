@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 
-export type AppScreen = 'projects' | 'new-project' | 'workspace';
+export type AppScreen =
+  | 'projects'
+  | 'new-project'
+  | 'workspace'
+  | 'battleship-lab';
 
 interface NavState {
   screen: AppScreen;
@@ -10,6 +14,7 @@ interface NavState {
   openWorkspace: (projectId: string) => void;
   goToProjects: () => void;
   goToNewProject: () => void;
+  goToBattleshipLab: () => void;
 }
 
 export const useNavigationStore = create<NavState>((set) => ({
@@ -20,4 +25,5 @@ export const useNavigationStore = create<NavState>((set) => ({
     set({ screen: 'workspace', openProjectId }),
   goToProjects: () => set({ screen: 'projects', openProjectId: null }),
   goToNewProject: () => set({ screen: 'new-project' }),
+  goToBattleshipLab: () => set({ screen: 'battleship-lab', openProjectId: null }),
 }));

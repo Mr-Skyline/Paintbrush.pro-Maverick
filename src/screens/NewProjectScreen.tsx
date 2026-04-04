@@ -64,9 +64,17 @@ export function NewProjectScreen() {
 
       <label
         className="mt-10 flex w-full max-w-xl cursor-pointer flex-col items-center rounded-2xl border-2 border-dashed border-blue-500/40 bg-ost-panel/80 px-8 py-20 transition hover:border-blue-400/60 hover:bg-ost-panel"
-        onDragOver={(e) => e.preventDefault()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
         onDrop={(e) => {
           e.preventDefault();
+          e.stopPropagation();
           if (e.dataTransfer.files?.length) void ingestFiles(e.dataTransfer.files);
         }}
       >

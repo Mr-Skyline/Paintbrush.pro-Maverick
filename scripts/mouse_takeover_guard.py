@@ -8,6 +8,7 @@ from __future__ import annotations
 import math
 import os
 import time
+import pathlib
 from typing import Any, Callable
 
 
@@ -30,6 +31,16 @@ def install_pyautogui_takeover_guard(pyautogui: Any) -> None:
     pause_s = float(os.environ.get("MAVERICK_MOUSE_TAKEOVER_PAUSE_S", "15") or 15.0)
     threshold_px = float(os.environ.get("MAVERICK_MOUSE_TAKEOVER_THRESHOLD_PX", "12") or 12.0)
     own_grace_s = float(os.environ.get("MAVERICK_MOUSE_TAKEOVER_GRACE_S", "0.8") or 0.8)
+    action = str(os.environ.get("MAVERICK_MOUSE_TAKEOVER_ACTION", "abort") or "abort").strip().lower()
+    if action not in {"pause", "abort"}:
+        action = "abort"
+    root = pathlib.Path(__file__).resolve().parent.parent
+    raw_pause_flag = str(os.environ.get("MAVERICK_EMERGENCY_PAUSE_FLAG", "") or "").strip()
+    if raw_pause_flag:
+        candidate = pathlib.Path(raw_pause_flag)
+        pause_flag = candidate if candidate.is_absolute() else (root / candidate)
+    else:
+        pause_flag = root / "output" / "maverick" / "emergency_pause.flag"
 
     state = {
         "last_pos": None,
@@ -40,6 +51,8 @@ def install_pyautogui_takeover_guard(pyautogui: Any) -> None:
         return math.hypot(float(a.x) - float(b.x), float(a.y) - float(b.y))
 
     def _pause_if_user_took_control() -> None:
+        if pause_flag.exists():
+            raise RuntimeError(f"emergency_pause_flag_detected:{pause_flag}")
         now = time.monotonic()
         pos = pyautogui.position()
         last_pos = state["last_pos"]
@@ -49,10 +62,10 @@ def install_pyautogui_takeover_guard(pyautogui: Any) -> None:
             and (now - last_prog) > own_grace_s
             and _dist(pos, last_pos) >= threshold_px
         ):
-            print(
-                f"mouse_takeover_detected pause_s={pause_s:.1f} "
-                f"moved_px={_dist(pos, last_pos):.1f}"
-            )
+            moved_px = _dist(pos, last_pos)
+            if action == "abort":
+                raise RuntimeError(f"mouse_takeover_detected_abort moved_px={moved_px:.1f}")
+            print(f"mouse_takeover_detected pause_s={pause_s:.1f} moved_px={moved_px:.1f}")
             time.sleep(max(0.0, pause_s))
         state["last_pos"] = pyautogui.position()
 
@@ -76,14 +89,20 @@ def install_pyautogui_takeover_guard(pyautogui: Any) -> None:
         "mouseDown",
         "mouseUp",
         "press",
+        "keyDown",
+        "keyUp",
         "hotkey",
+        "write",
+        "scroll",
+        "hscroll",
+        "vscroll",
     ):
         if hasattr(pyautogui, name):
             setattr(pyautogui, name, _wrap(getattr(pyautogui, name)))
 
     pyautogui._maverick_takeover_guard_installed = True
     print(
-        f"mouse_takeover_guard_enabled pause_s={pause_s:.1f} "
+        f"mouse_takeover_guard_enabled action={action} pause_s={pause_s:.1f} "
         f"threshold_px={threshold_px:.1f}"
     )
 

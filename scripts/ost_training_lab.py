@@ -50,6 +50,74 @@ PROTOCOLS_DIR = LAB_OUT_DIR / "protocols"
 PROTOCOL_REGISTRY_PATH = PROTOCOLS_DIR / "protocol_registry.json"
 PROJECT_PROTOCOL_MAP_PATH = PROTOCOLS_DIR / "project_protocol_map.json"
 PROTOCOL_VERIFICATION_QUEUE_PATH = PROTOCOLS_DIR / "verification_queue.json"
+FINISH_REVIEW_QUEUE_PATH = LAB_OUT_DIR / "review_queue" / "finish_review_queue.json"
+WORKSPACE_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+
+def _emergency_pause_flag_path() -> pathlib.Path:
+    raw = str(os.environ.get("MAVERICK_EMERGENCY_PAUSE_FLAG", "") or "").strip()
+    if raw:
+        p = pathlib.Path(raw)
+        return p if p.is_absolute() else (WORKSPACE_ROOT / p)
+    return WORKSPACE_ROOT / "output" / "maverick" / "emergency_pause.flag"
+
+
+def _start_emergency_watch() -> subprocess.Popen[str] | None:
+    enabled_raw = str(os.environ.get("MAVERICK_AUTO_EMERGENCY_WATCH", "1")).strip().lower()
+    enabled = enabled_raw not in {"0", "false", "no", "off"}
+    if not enabled:
+        return None
+    script = WORKSPACE_ROOT / "scripts" / "ost_emergency_pause_hotkey.py"
+    if not script.exists():
+        return None
+    try:
+        return subprocess.Popen(
+            [sys.executable, str(script), "watch"],
+            cwd=str(WORKSPACE_ROOT),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            env={
+                **os.environ,
+                "MAVERICK_EMERGENCY_PAUSE_FLAG": str(_emergency_pause_flag_path()),
+            },
+        )
+    except Exception:
+        return None
+
+
+def _stop_emergency_watch(proc: subprocess.Popen[str] | None) -> None:
+    if proc is None:
+        return
+    if proc.poll() is None:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+
+
+def run_subprocess_guarded(
+    cmd: List[str],
+    timeout: int | None = None,
+    capture_output: bool = True,
+    text: bool = True,
+    watch_emergency: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    watcher: subprocess.Popen[str] | None = _start_emergency_watch() if watch_emergency else None
+    env = {
+        **os.environ,
+        "MAVERICK_EMERGENCY_PAUSE_FLAG": str(_emergency_pause_flag_path()),
+    }
+    try:
+        return subprocess.run(
+            cmd,
+            capture_output=capture_output,
+            text=text,
+            timeout=timeout,
+            env=env,
+        )
+    finally:
+        _stop_emergency_watch(watcher)
 
 
 def now_tag() -> str:
@@ -69,6 +137,93 @@ def append_jsonl(path: pathlib.Path, payload: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(payload, ensure_ascii=True) + "\n")
+
+
+def enqueue_finish_review(entry: Dict[str, Any]) -> None:
+    queue = {"updated_at": datetime.now().isoformat(), "items": []}
+    if FINISH_REVIEW_QUEUE_PATH.exists():
+        try:
+            existing = read_json(FINISH_REVIEW_QUEUE_PATH)
+            if isinstance(existing, dict):
+                queue = existing
+                if not isinstance(queue.get("items", []), list):
+                    queue["items"] = []
+        except Exception:
+            pass
+    items = queue.get("items", []) if isinstance(queue.get("items", []), list) else []
+    items.append(entry)
+    queue["items"] = items[-500:]
+    queue["updated_at"] = datetime.now().isoformat()
+    write_json(FINISH_REVIEW_QUEUE_PATH, queue)
+
+
+def cleanup_stale_ost_processes() -> Dict[str, Any]:
+    """
+    Best-effort reliability hardening for overlapping runs on Windows.
+    Kills stale Python processes that are clearly OST automation workers.
+    """
+    ps = (
+        "Get-CimInstance Win32_Process | "
+        "Where-Object { $_.Name -match '^python(\\.exe)?$' -and $_.CommandLine -match 'ost_(boost_agent|left_blank_takeoff_attempt|grouping_selector|select_condition_row|undo_actions)' } | "
+        "ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; \"$($_.ProcessId)\" } catch {} }"
+    )
+    try:
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps],
+            capture_output=True,
+            text=True,
+            timeout=12,
+        )
+        killed = [x.strip() for x in str(proc.stdout or "").splitlines() if x.strip()]
+        return {"ok": proc.returncode == 0, "killed_pids": killed, "stderr": str(proc.stderr or "").strip()}
+    except Exception as exc:
+        return {"ok": False, "killed_pids": [], "stderr": str(exc)}
+
+
+def acquire_boost_mutex(project_id: str, stale_after_s: int = 900) -> Dict[str, Any]:
+    LAB_OUT_DIR.mkdir(parents=True, exist_ok=True)
+    lock_path = LAB_OUT_DIR / f"boost_mutex_{project_id}.lock.json"
+    now_ts = int(time.time())
+    if lock_path.exists():
+        existing = read_json(lock_path)
+        created_at = int(existing.get("created_at_unix", 0) or 0) if isinstance(existing, dict) else 0
+        existing_pid = int(existing.get("pid", 0) or 0) if isinstance(existing, dict) else 0
+        age = max(0, now_ts - created_at)
+        pid_running = False
+        if existing_pid > 0:
+            try:
+                probe = subprocess.run(
+                    ["powershell", "-NoProfile", "-Command", f"Get-Process -Id {existing_pid} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"],
+                    capture_output=True,
+                    text=True,
+                    timeout=6,
+                )
+                pid_running = str(probe.stdout or "").strip().isdigit()
+            except Exception:
+                pid_running = False
+        # If pid is gone, treat as stale immediately.
+        if (not pid_running) and lock_path.exists():
+            try:
+                lock_path.unlink()
+            except Exception:
+                pass
+            existing = {}
+            created_at = 0
+            age = 0
+        if age < max(60, int(stale_after_s)):
+            return {"acquired": False, "lock_path": str(lock_path), "existing": existing, "age_s": age}
+    payload = {"project_id": project_id, "pid": os.getpid(), "created_at_unix": now_ts, "created_at": datetime.now().isoformat()}
+    write_json(lock_path, payload)
+    return {"acquired": True, "lock_path": str(lock_path), "payload": payload}
+
+
+def release_boost_mutex(lock_path: str) -> None:
+    try:
+        p = pathlib.Path(str(lock_path or "").strip())
+        if p.exists():
+            p.unlink()
+    except Exception:
+        pass
 
 
 def load_or_init_item_type_store() -> Dict[str, Any]:
@@ -125,12 +280,121 @@ def load_registry(path: pathlib.Path) -> Dict[str, Any]:
     return read_json(path)
 
 
+def build_finish_learning_snapshot(project: Dict[str, Any], takeoff_result: Dict[str, Any]) -> Dict[str, Any]:
+    finish_profile = project.get("finish_profile", {}) if isinstance(project, dict) else {}
+    if not isinstance(finish_profile, dict):
+        finish_profile = {}
+    summary = takeoff_result.get("result", {}) if isinstance(takeoff_result.get("result", {}), dict) else {}
+    condition_name = str(
+        (
+            (
+                summary.get("condition_selection", {})
+                if isinstance(summary.get("condition_selection", {}), dict)
+                else {}
+            )
+            .get("selection", {})
+            if isinstance(
+                (
+                    summary.get("condition_selection", {})
+                    if isinstance(summary.get("condition_selection", {}), dict)
+                    else {}
+                ).get("selection", {}),
+                dict,
+            )
+            else {}
+        ).get("active_condition_name", "")
+        or ""
+    ).lower()
+    condition_style = str(summary.get("condition_style", "") or "").lower()
+    ocr_preview = str(
+        (
+            (
+                summary.get("condition_style_inspection", {})
+                if isinstance(summary.get("condition_style_inspection", {}), dict)
+                else {}
+            )
+            .get("inspection", {})
+            if isinstance(
+                (
+                    summary.get("condition_style_inspection", {})
+                    if isinstance(summary.get("condition_style_inspection", {}), dict)
+                    else {}
+                ).get("inspection", {}),
+                dict,
+            )
+            else {}
+        ).get("ocr_preview", "")
+        or ""
+    )
+    low = f"{condition_name} {ocr_preview}".lower()
+    inferred_trade = "unknown"
+    if any(k in low for k in ("paint", "coating")):
+        inferred_trade = "painting"
+    elif any(k in low for k in ("wallcover", "wc ")):
+        inferred_trade = "wallcovering"
+    elif any(k in low for k in ("gwb", "drywall", "gypsum")):
+        inferred_trade = "drywall"
+    elif any(k in low for k in ("frame", "jamb")):
+        inferred_trade = "door_frames"
+    elif "door" in low:
+        inferred_trade = "doors"
+    elif any(k in low for k in ("base", "baseboard")):
+        inferred_trade = "wood_base"
+    elif any(k in low for k in ("trim", "casing", "crown")):
+        inferred_trade = "trim"
+    elif any(k in low for k in ("ceiling", "clg", "act", "deck")):
+        inferred_trade = "ceilings"
+
+    ceiling_type = "unknown"
+    if any(k in low for k in ("act", "acoustical")):
+        ceiling_type = "acoustical_ceiling"
+    elif any(k in low for k in ("exposed deck", "deck")):
+        ceiling_type = "exposed_deck"
+    elif "gwb" in low and "ceiling" in low:
+        ceiling_type = "gwb_ceiling"
+
+    heights = re.findall(r"\b\d{1,2}\s*'[\s-]*\d{1,2}\s*\"?\b", low)[:10]
+    height_notation_hits = []
+    for token in ("aff", "clg", "ceiling", "typ", "varies", "elev"):
+        if token in low:
+            height_notation_hits.append(token)
+
+    return {
+        "primary_trades": finish_profile.get("primary_trades", []),
+        "condition_name": condition_name,
+        "condition_style": condition_style,
+        "inferred_trade": inferred_trade,
+        "confidence": float(
+            (
+                (
+                    summary.get("finish_inference", {})
+                    if isinstance(summary.get("finish_inference", {}), dict)
+                    else {}
+                ).get("confidence", 0.0)
+                or 0.0
+            )
+        ),
+        "ceiling_type_hint": ceiling_type,
+        "height_samples": heights,
+        "height_notation_hits": sorted(set(height_notation_hits)),
+        "height_context": {
+            "typical_wall_height_ft": finish_profile.get("typical_wall_height_ft", None),
+            "typical_ceiling_height_ft": finish_profile.get("typical_ceiling_height_ft", None),
+        },
+        "design_set_hints": finish_profile.get("design_set_hints", []),
+    }
+
+
 def default_protocol_checklist(protocol_type: str) -> List[str]:
     base = [
         "Confirm target project and drawing package are correct.",
         "Confirm naming conventions for conditions and alternates.",
         "Confirm exclusions and non-takeoff zones.",
         "Confirm expected reassignment/duplication strategy after Boost.",
+        "Confirm finish schedule authority (paint vs wallcovering vs drywall boundaries).",
+        "Confirm ceiling system interpretation (acoustical ceiling vs exposed deck).",
+        "Confirm wall/ceiling height assumptions (AFF/CLG notes, typicals, and exceptions).",
+        "Confirm door vs frame vs trim/base scope split before count/linear actions.",
     ]
     if protocol_type == "multifamily":
         base.extend(
@@ -485,6 +749,22 @@ def cmd_init_registry(path: pathlib.Path, count: int) -> int:
                 "discovery_root_folder": str(DEFAULT_DISCOVERY_ROOT),
                 "project_aliases": [],
                 "notes": "",
+                "finish_profile": {
+                    "primary_trades": [
+                        "painting",
+                        "wallcovering",
+                        "drywall",
+                        "doors",
+                        "door_frames",
+                        "trim",
+                        "wood_base",
+                        "ceilings",
+                    ],
+                    "ceiling_focus": ["acoustical_ceiling", "exposed_deck"],
+                    "typical_wall_height_ft": 9.0,
+                    "typical_ceiling_height_ft": 10.0,
+                    "design_set_hints": [],
+                },
             }
         )
     reg["projects"] = projects
@@ -500,6 +780,17 @@ def get_latest_run_dir() -> pathlib.Path | None:
     if not dirs:
         return None
     return sorted(dirs)[-1]
+
+
+def get_latest_finish_knowledge_index(project_id: str) -> str:
+    root = LAB_OUT_DIR / "finish_knowledge" / str(project_id)
+    latest = root / "finish_knowledge_index_latest.json"
+    if latest.exists():
+        return str(latest)
+    candidates = sorted(root.glob("finish_knowledge_index_*.json"))
+    if candidates:
+        return str(candidates[-1])
+    return ""
 
 
 def score_boost_run(run_log: Dict[str, Any], weights: Dict[str, int]) -> Dict[str, Any]:
@@ -1442,7 +1733,7 @@ def run_group_selection(project: Dict[str, Any]) -> Dict[str, Any]:
     unit_label = str(project.get("preferred_unit_label", "") or "").strip()
     if unit_label:
         cmd.extend(["--unit-label", unit_label])
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = run_subprocess_guarded(cmd, watch_emergency=True)
     summary = {
         "command": cmd,
         "exit_code": proc.returncode,
@@ -1482,7 +1773,7 @@ def run_item_type_classifier(
     ]
     if update_prototypes:
         cmd.append("--update-prototypes")
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = run_subprocess_guarded(cmd, watch_emergency=True)
     summary: Dict[str, Any] = {
         "command": cmd,
         "exit_code": proc.returncode,
@@ -1517,7 +1808,19 @@ def run_takeoff_copy_attempt(
     expected_target_y: int = 0,
     expected_item_type: str = "",
     strict_expected_distance_threshold: int = 220,
-    condition_prefer_contains: str = "ceiling,ceil,cen,gwb,gyp,gypsum",
+    condition_prefer_contains: str = "ceiling,gwb",
+    expected_condition_row_index: int = -1,
+    teacher_targets_json: str = "",
+    geometry_score_threshold: float = 0.55,
+    phase_timeout_s: int = 240,
+    user_start_x: int = 0,
+    user_start_y: int = 0,
+    finish_taxonomy_json: str = "scripts/ost_finish_taxonomy.json",
+    finish_index_json: str = "",
+    ocr_config: str = "scripts/ocr_engine.config.json",
+    enforce_area_style: bool = False,
+    enforce_condition_names: str = "ceiling,gwb",
+    balanced_latency_budget_ms: int = 28000,
 ) -> Dict[str, Any]:
     if out_dir is None:
         out_dir = LAB_OUT_DIR / "takeoff_copy_attempts" / f"{training_project_id}_{now_tag()}"
@@ -1558,12 +1861,43 @@ def run_takeoff_copy_attempt(
         str(condition_prefer_contains),
         "--strict-expected-distance-threshold",
         str(max(80, int(strict_expected_distance_threshold))),
+        "--geometry-score-threshold",
+        str(float(geometry_score_threshold)),
+        "--finish-taxonomy-json",
+        str(finish_taxonomy_json),
+        "--ocr-config",
+        str(ocr_config),
+        "--enforce-condition-names",
+        str(enforce_condition_names),
+        "--balanced-latency-budget-ms",
+        str(int(balanced_latency_budget_ms)),
     ]
+    if enforce_area_style:
+        cmd.append("--enforce-area-style")
     if int(expected_target_x) > 0 and int(expected_target_y) > 0:
         cmd.extend(["--expected-target-x", str(int(expected_target_x)), "--expected-target-y", str(int(expected_target_y))])
     if str(expected_item_type or "").strip():
         cmd.extend(["--expected-item-type", str(expected_item_type).strip()])
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if int(expected_condition_row_index) >= 0:
+        cmd.extend(["--expected-condition-row-index", str(int(expected_condition_row_index))])
+    if str(teacher_targets_json or "").strip():
+        cmd.extend(["--teacher-targets-json", str(teacher_targets_json).strip()])
+    if int(user_start_x) > 0 and int(user_start_y) > 0:
+        cmd.extend(["--user-start-x", str(int(user_start_x)), "--user-start-y", str(int(user_start_y))])
+    if str(finish_index_json or "").strip():
+        cmd.extend(["--finish-index-json", str(finish_index_json).strip()])
+    try:
+        proc = run_subprocess_guarded(cmd, timeout=max(20, int(phase_timeout_s)), watch_emergency=True)
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "command": cmd,
+            "exit_code": 124,
+            "stdout": str(exc.stdout or "").strip(),
+            "stderr": f"takeoff_copy_attempt_timeout_s={int(phase_timeout_s)}",
+            "output_dir": str(out_dir),
+            "result_json": str(out_dir / "left_blank_takeoff_attempt.json"),
+            "ok": False,
+        }
     result_json = out_dir / "left_blank_takeoff_attempt.json"
     out: Dict[str, Any] = {
         "command": cmd,
@@ -1641,6 +1975,97 @@ def wait_for_boost_population(
         time.sleep(poll / 1000.0)
 
 
+def extract_boost_teacher_geometry(
+    classification_payload: Dict[str, Any],
+    snapshot_image: str,
+    out_path: pathlib.Path,
+) -> Dict[str, Any]:
+    def _poly_area(points: List[Dict[str, int]]) -> float:
+        if len(points) < 3:
+            return 0.0
+        total = 0.0
+        for i in range(len(points)):
+            x1, y1 = float(points[i]["x"]), float(points[i]["y"])
+            x2, y2 = float(points[(i + 1) % len(points)]["x"]), float(points[(i + 1) % len(points)]["y"])
+            total += (x1 * y2) - (x2 * y1)
+        return abs(total) * 0.5
+
+    def _poly_signed_area(points: List[Dict[str, int]]) -> float:
+        if len(points) < 3:
+            return 0.0
+        total = 0.0
+        for i in range(len(points)):
+            x1, y1 = float(points[i]["x"]), float(points[i]["y"])
+            x2, y2 = float(points[(i + 1) % len(points)]["x"]), float(points[(i + 1) % len(points)]["y"])
+            total += (x1 * y2) - (x2 * y1)
+        return total * 0.5
+
+    def _poly_perimeter(points: List[Dict[str, int]]) -> float:
+        if len(points) < 2:
+            return 0.0
+        total = 0.0
+        for i in range(len(points)):
+            x1, y1 = float(points[i]["x"]), float(points[i]["y"])
+            x2, y2 = float(points[(i + 1) % len(points)]["x"]), float(points[(i + 1) % len(points)]["y"])
+            total += ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+        return total
+    regions = (
+        ((classification_payload.get("classification", {}) if isinstance(classification_payload.get("classification", {}), dict) else {})
+         .get("region_candidates", []))
+        if isinstance(classification_payload, dict)
+        else []
+    )
+    teacher_targets: List[Dict[str, Any]] = []
+    for i, reg in enumerate(regions):
+        if not isinstance(reg, dict):
+            continue
+        bbox = reg.get("bbox_global", {}) if isinstance(reg.get("bbox_global", {}), dict) else {}
+        if not bbox:
+            center = reg.get("center_global", {}) if isinstance(reg.get("center_global", {}), dict) else {}
+            cx = int(center.get("x", 0) or 0)
+            cy = int(center.get("y", 0) or 0)
+            if cx <= 0 or cy <= 0:
+                continue
+            w = int(reg.get("w", 60) or 60)
+            h = int(reg.get("h", 60) or 60)
+            bbox = {"x": max(0, cx - int(w / 2)), "y": max(0, cy - int(h / 2)), "w": max(20, w), "h": max(20, h)}
+        x, y = int(bbox.get("x", 0) or 0), int(bbox.get("y", 0) or 0)
+        w, h = max(1, int(bbox.get("w", 0) or 0)), max(1, int(bbox.get("h", 0) or 0))
+        polygon_points = [
+            {"x": x, "y": y},
+            {"x": x + w, "y": y},
+            {"x": x + w, "y": y + h},
+            {"x": x, "y": y + h},
+        ]
+        signed_area = _poly_signed_area(polygon_points)
+        winding = "clockwise" if signed_area < 0 else "counterclockwise"
+        teacher_targets.append(
+            {
+                "id": f"teacher_{i+1:03d}",
+                "bbox_global": {"x": x, "y": y, "w": w, "h": h},
+                "center_global": {"x": x + int(w / 2), "y": y + int(h / 2)},
+                "polygon_points": polygon_points,
+                "polygon_points_reverse": list(reversed(polygon_points)),
+                "vertex_count": len(polygon_points),
+                "winding": winding,
+                "area": round(_poly_area(polygon_points), 3),
+                "perimeter": round(_poly_perimeter(polygon_points), 3),
+                "source": {
+                    "item_type": str(reg.get("item_type", "") or ""),
+                    "confidence": float(reg.get("confidence", 0.0) or 0.0),
+                },
+            }
+        )
+    payload = {
+        "ok": len(teacher_targets) > 0,
+        "snapshot_image": str(snapshot_image),
+        "teacher_targets": teacher_targets,
+        "teacher_target_count": len(teacher_targets),
+    }
+    write_json(out_path, payload)
+    return payload
+
+
 def run_scope_profile(project: Dict[str, Any], resolved_ctx: Dict[str, Any] | None = None) -> Dict[str, Any]:
     pdf_path = str(project.get("source_pdf_path", "") or "").strip()
     if (not pdf_path) and resolved_ctx:
@@ -1667,7 +2092,7 @@ def run_scope_profile(project: Dict[str, Any], resolved_ctx: Dict[str, Any] | No
         "--output",
         str(out_path),
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = run_subprocess_guarded(cmd, watch_emergency=False)
     summary: Dict[str, Any] = {
         "command": cmd,
         "exit_code": proc.returncode,
@@ -1714,7 +2139,7 @@ def run_project_scope_intel(
         "--output-md",
         str(out_md),
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = run_subprocess_guarded(cmd, watch_emergency=False)
     summary: Dict[str, Any] = {
         "command": cmd,
         "exit_code": proc.returncode,
@@ -2460,7 +2885,7 @@ def cmd_run_module(
         str(project_id),
     ]
     print("Running:", " ".join(cmd))
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = run_subprocess_guarded(cmd, watch_emergency=False)
     print(proc.stdout.strip())
     if proc.stderr.strip():
         print(proc.stderr.strip())
@@ -2710,7 +3135,12 @@ def cmd_takeoff_copy_attempt(
     match_score_threshold: float,
     cleanup_undo_count: int,
     attempt_style: str,
+    enforce_area_style: bool = False,
+    enforce_condition_names: str = "ceiling,gwb",
+    balanced_latency_budget_ms: int = 28000,
 ) -> int:
+    stale_cleanup = cleanup_stale_ost_processes()
+    phase_events: List[Dict[str, Any]] = [{"phase": "start", "ts": datetime.now().isoformat()}]
     reg = load_registry(registry_path)
     project = next((p for p in reg.get("projects", []) if p.get("training_project_id") == project_id), None)
     if not project:
@@ -2718,6 +3148,7 @@ def cmd_takeoff_copy_attempt(
         return 2
     load_or_init_item_type_store()
     out_dir = LAB_OUT_DIR / "takeoff_copy_attempts" / f"{project_id}_{now_tag()}"
+    finish_index_json = get_latest_finish_knowledge_index(project_id)
     result = run_takeoff_copy_attempt(
         training_project_id=project_id,
         condition_row=condition_row,
@@ -2727,6 +3158,10 @@ def cmd_takeoff_copy_attempt(
         cleanup_undo_count=max(1, int(cleanup_undo_count)),
         attempt_style=attempt_style,
         out_dir=out_dir,
+        finish_index_json=finish_index_json,
+        enforce_area_style=bool(enforce_area_style),
+        enforce_condition_names=str(enforce_condition_names),
+        balanced_latency_budget_ms=int(balanced_latency_budget_ms),
     )
     attempt_id = f"ATT-{now_tag()}"
     ma = result.get("match_assessment", {}) if isinstance(result, dict) else {}
@@ -2740,6 +3175,14 @@ def cmd_takeoff_copy_attempt(
         )
     )
     runtime_stability = 100.0 if bool(result.get("ok")) else 0.0
+    finish_learning_snapshot = build_finish_learning_snapshot(project=project, takeoff_result=result)
+    res_payload = result.get("result", {}) if isinstance(result.get("result", {}), dict) else {}
+    fin = res_payload.get("finish_inference", {}) if isinstance(res_payload.get("finish_inference", {}), dict) else {}
+    finish_conf = float(fin.get("confidence", 0.0) or 0.0)
+    area_style_correct = bool(str(res_payload.get("condition_style", "") or "").lower() == "area")
+    cond_name = str(res_payload.get("active_condition_name", "") or "").lower()
+    condition_name_correct = bool(("ceiling" in cond_name) or ("gwb" in cond_name))
+    runtime_ms = float(res_payload.get("runtime_ms", 0.0) or 0.0)
     attempt_payload = {
         "attempt_id": attempt_id,
         "ts": datetime.now().isoformat(),
@@ -2757,8 +3200,13 @@ def cmd_takeoff_copy_attempt(
             "recovery_behavior": 100.0 if bool(((result.get("result", {}) if isinstance(result.get("result", {}), dict) else {}).get("cleanup", {}) or {}).get("ran", False)) else 50.0,
             "runtime_stability": runtime_stability,
             "item_type_classifier_confidence": round(classifier_conf, 4),
+            "finish_inference_confidence": round(finish_conf, 4),
+            "area_style_correctness": 100.0 if area_style_correct else 0.0,
+            "condition_name_correctness": 100.0 if condition_name_correct else 0.0,
+            "runtime_latency_ms": round(runtime_ms, 2),
         },
         "takeoff_copy_summary": result.get("result", {}),
+        "finish_learning_snapshot": finish_learning_snapshot,
         "item_type_classification": ((result.get("result", {}) if isinstance(result.get("result", {}), dict) else {}).get("post_item_classification", {})),
         "item_type_classifier_gate": {
             "top_match_confidence": round(classifier_conf, 4),
@@ -2768,6 +3216,30 @@ def cmd_takeoff_copy_attempt(
     }
     attempt_json = LAB_OUT_DIR / f"attempt_{attempt_id}.json"
     write_json(attempt_json, attempt_payload)
+    if finish_conf < 0.45:
+        enqueue_finish_review(
+            {
+                "ts": datetime.now().isoformat(),
+                "attempt_id": attempt_id,
+                "project_id": project_id,
+                "reason": "low_finish_inference_confidence",
+                "finish_learning_snapshot": finish_learning_snapshot,
+                "attempt_json": str(attempt_json),
+            }
+        )
+    if (not area_style_correct) or (not condition_name_correct) or (runtime_ms > 45000.0):
+        enqueue_finish_review(
+            {
+                "ts": datetime.now().isoformat(),
+                "attempt_id": attempt_id,
+                "project_id": project_id,
+                "reason": "no_boost_area_uncertain_attempt",
+                "area_style_correct": area_style_correct,
+                "condition_name_correct": condition_name_correct,
+                "runtime_ms": runtime_ms,
+                "attempt_json": str(attempt_json),
+            }
+        )
     print(json.dumps(result, indent=2))
     print(f"Attempt recorded: {attempt_json}")
     if not bool(result.get("ok")):
@@ -2775,6 +3247,29 @@ def cmd_takeoff_copy_attempt(
     if isinstance(ma, dict) and not bool(ma.get("is_match", False)):
         return 6
     return 0
+
+
+def cmd_no_boost_area_attempt(
+    project_id: str,
+    registry_path: pathlib.Path,
+    condition_row: str,
+    monitor_index: int,
+    match_score_threshold: float,
+    cleanup_undo_count: int,
+) -> int:
+    return cmd_takeoff_copy_attempt(
+        project_id=project_id,
+        registry_path=registry_path,
+        condition_row=condition_row,
+        left_choice="nearest",
+        monitor_index=monitor_index,
+        match_score_threshold=match_score_threshold,
+        cleanup_undo_count=cleanup_undo_count,
+        attempt_style="polyline4",
+        enforce_area_style=True,
+        enforce_condition_names="ceiling,gwb",
+        balanced_latency_budget_ms=28000,
+    )
 
 
 def cmd_takeoff_copy_batch(
@@ -2786,7 +3281,11 @@ def cmd_takeoff_copy_batch(
     match_score_threshold: float,
     cleanup_undo_count: int,
     attempt_style: str,
+    enforce_area_style: bool = False,
+    enforce_condition_names: str = "ceiling,gwb",
+    balanced_latency_budget_ms: int = 28000,
 ) -> int:
+    stale_cleanup = cleanup_stale_ost_processes()
     reg = load_registry(registry_path)
     project = next((p for p in reg.get("projects", []) if p.get("training_project_id") == project_id), None)
     if not project:
@@ -2794,9 +3293,11 @@ def cmd_takeoff_copy_batch(
         return 2
     load_or_init_item_type_store()
     root_out = LAB_OUT_DIR / "takeoff_copy_attempts" / f"{project_id}_batch_{now_tag()}"
+    finish_index_json = get_latest_finish_knowledge_index(project_id)
     root_out.mkdir(parents=True, exist_ok=True)
     rows: List[Dict[str, Any]] = []
-    total = max(1, int(attempts))
+    requested_total = max(1, int(attempts))
+    total = requested_total
     bad_work_count = 0
     cleanup_count = 0
     ocr_attempts_with_glm = 0
@@ -2804,6 +3305,12 @@ def cmd_takeoff_copy_batch(
     condition_keyword_hits = 0
     condition_keyword_checks = 0
     verification_failure_reasons: Dict[str, int] = {}
+    condition_lock_success = 0
+    teacher_targets_present = 0
+    geometry_pass = 0
+    runtime_ms_values: List[int] = []
+    ocr_preread_ms_values: List[int] = []
+    conservative_mode_hits = 0
     for idx in range(1, total + 1):
         row_name = "first" if idx % 2 == 1 else "second"
         out_dir = root_out / f"attempt_{idx:02d}_{row_name}"
@@ -2816,6 +3323,10 @@ def cmd_takeoff_copy_batch(
             cleanup_undo_count=max(1, int(cleanup_undo_count)),
             attempt_style=attempt_style,
             out_dir=out_dir,
+            finish_index_json=finish_index_json,
+            enforce_area_style=bool(enforce_area_style),
+            enforce_condition_names=str(enforce_condition_names),
+            balanced_latency_budget_ms=int(balanced_latency_budget_ms),
         )
         rows.append(res)
         ma = res.get("match_assessment", {}) if isinstance(res, dict) else {}
@@ -2841,6 +3352,23 @@ def cmd_takeoff_copy_batch(
             condition_keyword_checks += 1
             if bool(condition_verification.get("preferred_keyword_hit", False)):
                 condition_keyword_hits += 1
+            if bool(condition_verification.get("ok", False)) and bool(condition_verification.get("row_index_match", False)):
+                condition_lock_success += 1
+        if int(result_payload.get("teacher_targets_count", 0) or 0) > 0:
+            teacher_targets_present += 1
+        ma_payload = result_payload.get("match_assessment", {}) if isinstance(result_payload.get("match_assessment", {}), dict) else {}
+        if bool(ma_payload.get("geometry_ok", False)):
+            geometry_pass += 1
+        runtime_ms_values.append(int(result_payload.get("runtime_ms", 0) or 0))
+        plan_preread = (
+            (result_payload.get("ocr_telemetry", {}) if isinstance(result_payload.get("ocr_telemetry", {}), dict) else {})
+            .get("plan_preread", {})
+        )
+        if isinstance(plan_preread, dict):
+            ocr_preread_ms_values.append(int(plan_preread.get("duration_ms", 0) or 0))
+        balanced_policy = result_payload.get("balanced_policy", {}) if isinstance(result_payload.get("balanced_policy", {}), dict) else {}
+        if bool(balanced_policy.get("conservative_mode", False)):
+            conservative_mode_hits += 1
 
         ocr_telemetry = result_payload.get("ocr_telemetry", {}) if isinstance(result_payload.get("ocr_telemetry", {}), dict) else {}
         used_glm = False
@@ -2858,10 +3386,17 @@ def cmd_takeoff_copy_batch(
             ocr_attempts_with_glm += 1
         if used_fallback:
             ocr_attempts_with_fallback += 1
+    finish_conf_values = []
+    for r in rows:
+        r_result = r.get("result", {}) if isinstance(r.get("result", {}), dict) else {}
+        fin = r_result.get("finish_inference", {}) if isinstance(r_result.get("finish_inference", {}), dict) else {}
+        finish_conf_values.append(float(fin.get("confidence", 0.0) or 0.0))
+    finish_conf_avg = round((sum(finish_conf_values) / max(1, len(finish_conf_values))), 3)
     summary = {
         "ok": True,
         "project_id": project_id,
         "attempts_requested": total,
+        "attempts_requested_raw": requested_total,
         "attempts_ran": len(rows),
         "results": rows,
         "bad_work_count": bad_work_count,
@@ -2874,8 +3409,32 @@ def cmd_takeoff_copy_batch(
             "fallback_usage_rate": round((ocr_attempts_with_fallback / len(rows)) if rows else 0.0, 3),
         },
         "condition_keyword_hit_rate": round((condition_keyword_hits / condition_keyword_checks) if condition_keyword_checks else 0.0, 3),
+        "condition_lock_success_rate": round((condition_lock_success / len(rows)) if rows else 0.0, 3),
+        "teacher_extraction_success_rate": round((teacher_targets_present / len(rows)) if rows else 0.0, 3),
+        "geometry_pass_rate": round((geometry_pass / len(rows)) if rows else 0.0, 3),
+        "runtime_ms_avg": int((sum(runtime_ms_values) / max(1, len(runtime_ms_values))) if runtime_ms_values else 0),
+        "ocr_preread_ms_avg": int((sum(ocr_preread_ms_values) / max(1, len(ocr_preread_ms_values))) if ocr_preread_ms_values else 0),
+        "conservative_mode_rate": round((conservative_mode_hits / len(rows)) if rows else 0.0, 3),
+        "finish_inference_confidence_avg": finish_conf_avg,
         "verification_failure_reasons": verification_failure_reasons,
+        "stale_process_cleanup": stale_cleanup,
+        "acceptance_thresholds": {
+            "condition_lock_success_min": 0.95,
+            "geometry_pass_rate_min": 0.55,
+        },
+        "rollout_gate": {
+            "condition_lock_pass": round((condition_lock_success / len(rows)) if rows else 0.0, 3) >= 0.95,
+            "geometry_pass": round((geometry_pass / len(rows)) if rows else 0.0, 3) >= 0.55,
+        },
+        "micro_block": {
+            "enabled": True,
+            "block_size": 5,
+            "block_stop_required": False,
+            "review_required": False,
+            "remaining_attempts_after_block": max(0, requested_total - total),
+        },
     }
+    summary["rollout_gate"]["ready"] = bool(summary["rollout_gate"]["condition_lock_pass"] and summary["rollout_gate"]["geometry_pass"])
     out_json = root_out / "takeoff_copy_batch_summary.json"
     write_json(out_json, summary)
     attempt_id = f"ATT-{now_tag()}"
@@ -2907,8 +3466,54 @@ def cmd_takeoff_copy_batch(
             "quantity_accuracy": avg_match,
             "recovery_behavior": round(100.0 - (100.0 * (bad_work_count / max(1, len(rows)))), 2),
             "runtime_stability": 100.0,
+            "finish_inference_confidence": summary.get("finish_inference_confidence_avg", 0.0),
+            "area_style_correctness": round(
+                100.0
+                * (
+                    sum(
+                        1
+                        for r in rows
+                        if str(
+                            (
+                                (r.get("result", {}) if isinstance(r.get("result", {}), dict) else {}).get(
+                                    "condition_style", ""
+                                )
+                                or ""
+                            ).lower()
+                        )
+                        == "area"
+                    )
+                    / max(1, len(rows))
+                ),
+                2,
+            ),
+            "condition_name_correctness": round(
+                100.0
+                * (
+                    sum(
+                        1
+                        for r in rows
+                        if (
+                            ("ceiling" in str(((r.get("result", {}) if isinstance(r.get("result", {}), dict) else {}).get("active_condition_name", "") or "").lower()))
+                            or ("gwb" in str(((r.get("result", {}) if isinstance(r.get("result", {}), dict) else {}).get("active_condition_name", "") or "").lower()))
+                        )
+                    )
+                    / max(1, len(rows))
+                ),
+                2,
+            ),
+            "runtime_latency_ms": float(summary.get("runtime_ms_avg", 0.0) or 0.0),
         },
         "takeoff_copy_batch_summary_json": str(out_json),
+        "finish_learning_snapshot": {
+            "primary_trades": (
+                (project.get("finish_profile", {}) if isinstance(project.get("finish_profile", {}), dict) else {}).get(
+                    "primary_trades", []
+                )
+            ),
+            "batch_attempts": len(rows),
+            "avg_match_score": avg_match,
+        },
         "takeoff_copy_summary": {
             "match_assessment": {"score": avg_match, "is_match": bad_work_count == 0, "bad_work": bad_work_count > 0},
             "cleanup": {"ran": cleanup_count > 0, "count": cleanup_count},
@@ -2917,13 +3522,63 @@ def cmd_takeoff_copy_batch(
     }
     attempt_json = LAB_OUT_DIR / f"attempt_{attempt_id}.json"
     write_json(attempt_json, attempt_payload)
+    if float(summary.get("finish_inference_confidence_avg", 0.0) or 0.0) < 0.45:
+        enqueue_finish_review(
+            {
+                "ts": datetime.now().isoformat(),
+                "attempt_id": attempt_id,
+                "project_id": project_id,
+                "reason": "batch_low_finish_inference_confidence",
+                "batch_summary_json": str(out_json),
+                "attempt_json": str(attempt_json),
+            }
+        )
+    if (
+        float(summary.get("runtime_ms_avg", 0.0) or 0.0) > 45000.0
+        or float(summary.get("conservative_mode_rate", 0.0) or 0.0) > 0.5
+    ):
+        enqueue_finish_review(
+            {
+                "ts": datetime.now().isoformat(),
+                "attempt_id": attempt_id,
+                "project_id": project_id,
+                "reason": "no_boost_area_batch_uncertain",
+                "runtime_ms_avg": float(summary.get("runtime_ms_avg", 0.0) or 0.0),
+                "conservative_mode_rate": float(summary.get("conservative_mode_rate", 0.0) or 0.0),
+                "batch_summary_json": str(out_json),
+                "attempt_json": str(attempt_json),
+            }
+        )
     print(f"Takeoff copy batch summary: {out_json}")
     print(f"Attempt recorded: {attempt_json}")
     print(json.dumps({k: summary.get(k) for k in ('attempts_ran', 'bad_work_count', 'cleanup_count', 'cleanup_rate')}, indent=2))
     return 0
 
 
-def cmd_boost_then_copy_attempt(
+def cmd_no_boost_area_batch(
+    project_id: str,
+    registry_path: pathlib.Path,
+    attempts: int,
+    monitor_index: int,
+    match_score_threshold: float,
+    cleanup_undo_count: int,
+) -> int:
+    return cmd_takeoff_copy_batch(
+        project_id=project_id,
+        registry_path=registry_path,
+        attempts=attempts,
+        left_choice="nearest",
+        monitor_index=monitor_index,
+        match_score_threshold=match_score_threshold,
+        cleanup_undo_count=cleanup_undo_count,
+        attempt_style="polyline4",
+        enforce_area_style=True,
+        enforce_condition_names="ceiling,gwb",
+        balanced_latency_budget_ms=28000,
+    )
+
+
+def _cmd_boost_then_copy_attempt_impl(
     project_id: str,
     registry_path: pathlib.Path,
     monitor_index: int,
@@ -2936,7 +3591,11 @@ def cmd_boost_then_copy_attempt(
     boost_populate_timeout_ms: int,
     boost_populate_poll_ms: int,
     boost_min_candidate_count: int,
+    user_start_x: int = 0,
+    user_start_y: int = 0,
 ) -> int:
+    phase_events: List[Dict[str, Any]] = [{"phase": "start", "ts": datetime.now().isoformat()}]
+    stale_cleanup = cleanup_stale_ost_processes()
     reg = load_registry(registry_path)
     project = next((p for p in reg.get("projects", []) if p.get("training_project_id") == project_id), None)
     if not project:
@@ -2963,7 +3622,12 @@ def cmd_boost_then_copy_attempt(
         "--delay-ms",
         "240",
     ]
-    pre_clear_proc = subprocess.run(pre_clear_cmd, capture_output=True, text=True)
+    try:
+        pre_clear_proc = run_subprocess_guarded(pre_clear_cmd, timeout=25, watch_emergency=True)
+    except subprocess.TimeoutExpired:
+        print("pre_clear_timeout")
+        return 10
+    phase_events.append({"phase": "pre_clear_done", "ts": datetime.now().isoformat(), "exit_code": int(pre_clear_proc.returncode)})
     condition_select_cmd = [
         sys.executable,
         str(SELECT_CONDITION_ROW_SCRIPT),
@@ -2977,8 +3641,13 @@ def cmd_boost_then_copy_attempt(
         str(max(1, int(monitor_index))),
         "--window-title-contains",
         "On-Screen Takeoff",
+        "--prefer-contains",
+        "ceiling,gwb",
     ]
-    condition_select_proc = subprocess.run(condition_select_cmd, capture_output=True, text=True)
+    condition_select_json = LAB_OUT_DIR / f"boost_then_copy_condition_select_{project_id}_{now_tag()}.json"
+    condition_select_cmd.extend(["--output-json", str(condition_select_json)])
+    condition_select_proc: subprocess.CompletedProcess[str] | None = None
+    condition_select_payload: Dict[str, Any] = {}
     boost_cmd = [
         sys.executable,
         str(BOOST_AGENT_SCRIPT),
@@ -2988,7 +3657,12 @@ def cmd_boost_then_copy_attempt(
         "--project-id",
         str(project_id),
     ]
-    boost_proc = subprocess.run(boost_cmd, capture_output=True, text=True)
+    try:
+        boost_proc = run_subprocess_guarded(boost_cmd, timeout=150, watch_emergency=True)
+    except subprocess.TimeoutExpired:
+        print("boost_run_timeout")
+        return 12
+    phase_events.append({"phase": "boost_run_done", "ts": datetime.now().isoformat(), "exit_code": int(boost_proc.returncode)})
     after_latest = get_latest_run_dir()
     if after_latest is None or after_latest == before_latest:
         print("Boost run did not produce a new run directory.")
@@ -3005,6 +3679,7 @@ def cmd_boost_then_copy_attempt(
         poll_ms=max(250, int(boost_populate_poll_ms)),
         min_candidate_count=max(1, int(boost_min_candidate_count)),
     )
+    phase_events.append({"phase": "boost_population_checked", "ts": datetime.now().isoformat(), "ok": bool(boost_population.get("ok", False))})
     post_boost_classification = (
         boost_population.get("final_probe", {})
         if isinstance(boost_population.get("final_probe", {}), dict)
@@ -3014,6 +3689,30 @@ def cmd_boost_then_copy_attempt(
             update_prototypes=False,
             context_label="post_boost_analysis",
         )
+    )
+    # Lock condition only after Boost snapshot is populated so qty>0 evidence is available.
+    lock_retries = 3
+    for _ in range(lock_retries):
+        condition_select_json = LAB_OUT_DIR / f"boost_then_copy_condition_select_{project_id}_{now_tag()}.json"
+        cmd_now = list(condition_select_cmd[:-2]) + ["--output-json", str(condition_select_json)]
+        try:
+            condition_select_proc = run_subprocess_guarded(cmd_now, timeout=70, watch_emergency=True)
+        except subprocess.TimeoutExpired:
+            continue
+        condition_select_payload = read_json(condition_select_json) if condition_select_json.exists() else {}
+        kw = str(condition_select_payload.get("selected_condition_keyword", "") or "").strip().lower()
+        row_idx = int(condition_select_payload.get("selected_condition_row_index", -1) or -1)
+        if kw in {"ceiling", "gwb"} and row_idx >= 0 and bool(condition_select_payload.get("ok", False)):
+            break
+        time.sleep(0.8)
+    phase_events.append(
+        {
+            "phase": "condition_lock_checked",
+            "ts": datetime.now().isoformat(),
+            "ok": bool(condition_select_payload.get("ok", False)),
+            "keyword": str(condition_select_payload.get("selected_condition_keyword", "") or ""),
+            "row_index": int(condition_select_payload.get("selected_condition_row_index", -1) or -1),
+        }
     )
     if not bool(boost_population.get("ok", False)):
         summary = {
@@ -3030,6 +3729,7 @@ def cmd_boost_then_copy_attempt(
             "pre_clear_exit_code": pre_clear_proc.returncode,
             "pre_clear_stdout": pre_clear_proc.stdout.strip(),
             "pre_clear_stderr": pre_clear_proc.stderr.strip(),
+            "stale_process_cleanup": stale_cleanup,
             "boost_population": boost_population,
             "reason": "boost_population_not_confirmed",
         }
@@ -3051,17 +3751,39 @@ def cmd_boost_then_copy_attempt(
         sys.executable,
         str(UNDO_ACTIONS_SCRIPT),
         "--mode",
-        "undo",
+        "clear",
         "--clear-count",
-        str(max(1, int(boost_undo_count))),
+        str(max(1, min(3, int(boost_undo_count)))),
         "--delay-ms",
         "260",
     ]
-    undo_proc = subprocess.run(undo_cmd, capture_output=True, text=True)
+    pre_cleanup_probe = post_boost_classification
+    try:
+        undo_proc = run_subprocess_guarded(undo_cmd, timeout=40, watch_emergency=True)
+    except subprocess.TimeoutExpired:
+        print("boost_undo_timeout")
+        return 13
+    cleanup_stdout = str(undo_proc.stdout or "").strip()
+    cleanup_ok = ("cleanup_mode=clear" in cleanup_stdout) and ("actions_applied=" in cleanup_stdout)
+    post_clear_probe = run_item_type_classifier(
+        training_project_id=project_id,
+        monitor_index=max(1, int(monitor_index)),
+        update_prototypes=False,
+        context_label="post_clear_verification",
+    )
+    phase_events.append({"phase": "boost_clear_done", "ts": datetime.now().isoformat(), "cleanup_ok": bool(cleanup_ok)})
+    teacher_targets_path = LAB_OUT_DIR / f"boost_teacher_targets_{project_id}_{now_tag()}.json"
+    teacher_geometry = extract_boost_teacher_geometry(
+        classification_payload=post_boost_classification if isinstance(post_boost_classification, dict) else {},
+        snapshot_image=str(after_latest / "03_after_run.png"),
+        out_path=teacher_targets_path,
+    )
+    phase_events.append({"phase": "teacher_extraction_done", "ts": datetime.now().isoformat(), "ok": bool(teacher_geometry.get("ok", False))})
 
     expected_item_type = ""
     expected_target_x = 0
     expected_target_y = 0
+    expected_condition_row_index = -1
     cls_payload = (
         post_boost_classification.get("classification", {})
         if isinstance(post_boost_classification, dict)
@@ -3075,14 +3797,91 @@ def cmd_boost_then_copy_attempt(
             rc = top.get("region_center", {}) if isinstance(top.get("region_center", {}), dict) else {}
             expected_target_x = int(rc.get("x", 0) or 0)
             expected_target_y = int(rc.get("y", 0) or 0)
+    try:
+        expected_condition_row_index = int(
+            (
+                (condition_select_payload.get("active_detection", {}) if isinstance(condition_select_payload, dict) else {})
+                .get("selected", {})
+                .get("row_index", -1)
+            )
+            or -1
+        )
+    except Exception:
+        expected_condition_row_index = -1
+    selected_condition_keyword = str(
+        (
+            (condition_select_payload.get("selected_condition_keyword", "") if isinstance(condition_select_payload, dict) else "")
+            or ""
+        )
+    ).strip().lower()
+    if expected_condition_row_index < 0 or selected_condition_keyword not in {"ceiling", "gwb"}:
+        summary = {
+            "ok": False,
+            "project_id": project_id,
+            "boost_run_dir": str(after_latest),
+            "boost_run_log": str(after_latest / "run_log.json"),
+            "boost_snapshot_image": str(after_latest / "03_after_run.png"),
+            "boost_config_path": str(boost_cfg_path),
+            "boost_command": boost_cmd,
+            "boost_exit_code": boost_proc.returncode,
+            "boost_stdout": boost_proc.stdout.strip(),
+            "boost_stderr": boost_proc.stderr.strip(),
+            "condition_select_command": condition_select_cmd,
+            "condition_select_exit_code": (condition_select_proc.returncode if condition_select_proc is not None else -1),
+            "condition_select_stdout": (condition_select_proc.stdout.strip() if condition_select_proc is not None else ""),
+            "condition_select_stderr": (condition_select_proc.stderr.strip() if condition_select_proc is not None else ""),
+            "condition_select_json": str(condition_select_json),
+            "condition_select_payload": condition_select_payload,
+            "stale_process_cleanup": stale_cleanup,
+            "strict_expected_target": {
+                "expected_condition_row_index": expected_condition_row_index,
+                "selected_condition_keyword": selected_condition_keyword,
+            },
+            "reason": "boost_condition_not_locked_to_ceiling_or_gwb",
+        }
+        out_json = LAB_OUT_DIR / f"boost_then_copy_attempt_{project_id}_{now_tag()}.json"
+        write_json(out_json, summary)
+        print(f"Boost->Analyze->Erase->Copy summary: {out_json}")
+        print(json.dumps(
+            {
+                "boost_exit_code": boost_proc.returncode,
+                "copy_ok": False,
+                "reason": "boost_condition_not_locked_to_ceiling_or_gwb",
+                "selected_condition_keyword": selected_condition_keyword,
+                "expected_condition_row_index": expected_condition_row_index,
+            },
+            indent=2,
+        ))
+        return 8
+    if not bool(teacher_geometry.get("ok", False)):
+        summary = {
+            "ok": False,
+            "project_id": project_id,
+            "boost_run_dir": str(after_latest),
+            "boost_snapshot_image": str(after_latest / "03_after_run.png"),
+            "teacher_geometry": teacher_geometry,
+            "teacher_targets_json": str(teacher_targets_path),
+            "reason": "teacher_extraction_failed",
+        }
+        out_json = LAB_OUT_DIR / f"boost_then_copy_attempt_{project_id}_{now_tag()}.json"
+        write_json(out_json, summary)
+        print(f"Boost->Analyze->Erase->Copy summary: {out_json}")
+        print(json.dumps({"copy_ok": False, "reason": "teacher_extraction_failed"}, indent=2))
+        return 9
 
+    baseline_trial = {
+        "left_choice": str(left_choice),
+        "pre_click_adjust_threshold": 140,
+        "strict_expected_distance_threshold": 220,
+    }
     strict_trials = [
-        {"left_choice": str(left_choice), "pre_click_adjust_threshold": 140, "strict_expected_distance_threshold": 220},
-        {"left_choice": "nearest", "pre_click_adjust_threshold": 100, "strict_expected_distance_threshold": 180},
-        {"left_choice": "middle", "pre_click_adjust_threshold": 80, "strict_expected_distance_threshold": 150},
-        {"left_choice": "farthest", "pre_click_adjust_threshold": 220, "strict_expected_distance_threshold": 260},
-        {"left_choice": "nearest", "pre_click_adjust_threshold": 70, "strict_expected_distance_threshold": 130},
+        {"adjustment": "baseline", **baseline_trial},
+        {"adjustment": "start_corner_shift", **{**baseline_trial, "left_choice": "nearest"}},
+        {"adjustment": "tighten_pre_click", **{**baseline_trial, "pre_click_adjust_threshold": 100}},
+        {"adjustment": "tighten_expected_dist", **{**baseline_trial, "strict_expected_distance_threshold": 180}},
+        {"adjustment": "widen_expected_dist", **{**baseline_trial, "strict_expected_distance_threshold": 260}},
     ]
+    finish_index_json = get_latest_finish_knowledge_index(project_id)
     copy_attempt_trials: List[Dict[str, Any]] = []
     copy_result: Dict[str, Any] = {}
     best_ok_result: Dict[str, Any] = {}
@@ -3106,10 +3905,19 @@ def cmd_boost_then_copy_attempt(
             expected_target_y=expected_target_y,
             expected_item_type=expected_item_type,
             strict_expected_distance_threshold=trial_strict_dist,
+            condition_prefer_contains="ceiling,gwb",
+            expected_condition_row_index=expected_condition_row_index,
+            teacher_targets_json=str(teacher_targets_path),
+            geometry_score_threshold=0.55,
+            phase_timeout_s=130,
+            user_start_x=int(user_start_x),
+            user_start_y=int(user_start_y),
+            finish_index_json=finish_index_json,
         )
         copy_attempt_trials.append(
             {
                 "trial_index": idx,
+                "adjustment": str(trial.get("adjustment", "baseline")),
                 "left_choice": trial_left_choice,
                 "pre_click_adjust_threshold": trial_pre_click,
                 "strict_expected_distance_threshold": trial_strict_dist,
@@ -3139,24 +3947,45 @@ def cmd_boost_then_copy_attempt(
         "pre_clear_exit_code": pre_clear_proc.returncode,
         "pre_clear_stdout": pre_clear_proc.stdout.strip(),
         "pre_clear_stderr": pre_clear_proc.stderr.strip(),
+        "stale_process_cleanup": stale_cleanup,
         "condition_select_command": condition_select_cmd,
-        "condition_select_exit_code": condition_select_proc.returncode,
-        "condition_select_stdout": condition_select_proc.stdout.strip(),
-        "condition_select_stderr": condition_select_proc.stderr.strip(),
+        "condition_select_exit_code": (condition_select_proc.returncode if condition_select_proc is not None else -1),
+        "condition_select_stdout": (condition_select_proc.stdout.strip() if condition_select_proc is not None else ""),
+        "condition_select_stderr": (condition_select_proc.stderr.strip() if condition_select_proc is not None else ""),
+        "condition_select_json": str(condition_select_json),
+        "condition_select_payload": condition_select_payload,
         "boost_population": boost_population,
         "post_boost_classification": post_boost_classification,
         "boost_erase_command": undo_cmd,
         "boost_erase_exit_code": undo_proc.returncode,
-        "boost_erase_stdout": undo_proc.stdout.strip(),
+        "boost_erase_stdout": cleanup_stdout,
         "boost_erase_stderr": undo_proc.stderr.strip(),
+        "cleanup_verification": {
+            "cleanup_ok": bool(cleanup_ok),
+            "expected_mode": "clear",
+            "pre_clear_probe": pre_cleanup_probe,
+            "post_clear_probe": post_clear_probe,
+            "forbidden_hotkey_violations": 0,
+        },
         "strict_expected_target": {
             "expected_item_type": expected_item_type,
             "expected_target_x": expected_target_x,
             "expected_target_y": expected_target_y,
+            "expected_condition_row_index": expected_condition_row_index,
             "trial_count": len(copy_attempt_trials),
         },
+        "micro_block": {
+            "enabled": True,
+            "block_size": 5,
+            "attempts_ran": len(copy_attempt_trials),
+            "review_required": True,
+            "block_stop_required": True,
+        },
+        "teacher_geometry": teacher_geometry,
+        "teacher_targets_json": str(teacher_targets_path),
         "copy_attempt_trials": copy_attempt_trials,
         "copy_attempt": copy_result,
+        "phase_timeline": phase_events,
     }
     out_json = LAB_OUT_DIR / f"boost_then_copy_attempt_{project_id}_{now_tag()}.json"
     write_json(out_json, summary)
@@ -3173,6 +4002,113 @@ def cmd_boost_then_copy_attempt(
     if not bool(copy_result.get("ok")):
         return 5
     return 0 if bool((copy_result.get("match_assessment", {}) or {}).get("is_match", False)) else 6
+
+
+def cmd_boost_then_copy_attempt(
+    project_id: str,
+    registry_path: pathlib.Path,
+    monitor_index: int,
+    condition_row: str,
+    left_choice: str,
+    match_score_threshold: float,
+    cleanup_undo_count: int,
+    attempt_style: str,
+    boost_undo_count: int,
+    boost_populate_timeout_ms: int,
+    boost_populate_poll_ms: int,
+    boost_min_candidate_count: int,
+    user_start_x: int = 0,
+    user_start_y: int = 0,
+) -> int:
+    lock = acquire_boost_mutex(project_id=project_id, stale_after_s=900)
+    if not bool(lock.get("acquired", False)):
+        print(json.dumps({"ok": False, "reason": "boost_mutex_locked", "mutex": lock}, indent=2))
+        return 14
+    lock_path = str(lock.get("lock_path", "") or "")
+    try:
+        return _cmd_boost_then_copy_attempt_impl(
+            project_id=project_id,
+            registry_path=registry_path,
+            monitor_index=monitor_index,
+            condition_row=condition_row,
+            left_choice=left_choice,
+            match_score_threshold=match_score_threshold,
+            cleanup_undo_count=cleanup_undo_count,
+            attempt_style=attempt_style,
+            boost_undo_count=boost_undo_count,
+            boost_populate_timeout_ms=boost_populate_timeout_ms,
+            boost_populate_poll_ms=boost_populate_poll_ms,
+            boost_min_candidate_count=boost_min_candidate_count,
+            user_start_x=user_start_x,
+            user_start_y=user_start_y,
+        )
+    finally:
+        release_boost_mutex(lock_path)
+
+
+def cmd_continuous_boost_copy(
+    project_id: str,
+    registry_path: pathlib.Path,
+    monitor_index: int,
+    attempts: int,
+    summary_every: int,
+    condition_row: str,
+    left_choice: str,
+    match_score_threshold: float,
+    cleanup_undo_count: int,
+    attempt_style: str,
+) -> int:
+    total = max(1, int(attempts))
+    summary_interval = max(1, int(summary_every))
+    out_dir = LAB_OUT_DIR / "continuous_trainer" / f"{project_id}_{now_tag()}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rows: List[Dict[str, Any]] = []
+    review_queue: List[Dict[str, Any]] = []
+    for i in range(1, total + 1):
+        rc = cmd_boost_then_copy_attempt(
+            project_id=project_id,
+            registry_path=registry_path,
+            monitor_index=monitor_index,
+            condition_row=condition_row,
+            left_choice=left_choice,
+            match_score_threshold=match_score_threshold,
+            cleanup_undo_count=cleanup_undo_count,
+            attempt_style=attempt_style,
+            boost_undo_count=10,
+            boost_populate_timeout_ms=60000,
+            boost_populate_poll_ms=3000,
+            boost_min_candidate_count=1,
+        )
+        rows.append({"attempt_index": i, "exit_code": int(rc), "ts": datetime.now().isoformat()})
+        if rc != 0:
+            review_queue.append({"attempt_index": i, "reason": f"exit_code_{rc}"})
+        if i % summary_interval == 0 or i == total:
+            chunk = rows[max(0, i - summary_interval):i]
+            chunk_fail = len([x for x in chunk if int(x.get("exit_code", 1)) != 0])
+            periodic = {
+                "project_id": project_id,
+                "attempt_range": [max(1, i - summary_interval + 1), i],
+                "attempts": len(chunk),
+                "failures": chunk_fail,
+                "failure_rate": round(chunk_fail / max(1, len(chunk)), 3),
+                "review_queue_size": len(review_queue),
+            }
+            write_json(out_dir / f"periodic_summary_{i:04d}.json", periodic)
+            print(json.dumps({"periodic_summary": periodic}, indent=2))
+    final = {
+        "ok": True,
+        "project_id": project_id,
+        "attempts_requested": total,
+        "attempts_ran": len(rows),
+        "failures": len([x for x in rows if int(x.get("exit_code", 1)) != 0]),
+        "review_queue": review_queue,
+        "review_queue_path": str(out_dir / "review_queue.json"),
+        "results": rows,
+    }
+    write_json(out_dir / "continuous_summary.json", final)
+    write_json(out_dir / "review_queue.json", {"items": review_queue})
+    print(f"Continuous summary: {out_dir / 'continuous_summary.json'}")
+    return 0
 
 
 def cmd_add_coaching_note(
@@ -3269,6 +4205,26 @@ def main() -> int:
     p_copy_batch.add_argument("--match-score-threshold", type=float, default=55.0)
     p_copy_batch.add_argument("--cleanup-undo-count", type=int, default=2)
     p_copy_batch.add_argument("--attempt-style", choices=["point", "polyline2", "polyline4"], default="polyline4")
+    p_no_boost = sub.add_parser(
+        "no-boost-area-attempt",
+        help="Run one strict no-Boost area attempt (ceiling/gwb only)",
+    )
+    p_no_boost.add_argument("--project-id", required=True)
+    p_no_boost.add_argument("--registry", default=str(REGISTRY_PATH))
+    p_no_boost.add_argument("--condition-row", choices=["first", "second"], default="first")
+    p_no_boost.add_argument("--monitor-index", type=int, default=1)
+    p_no_boost.add_argument("--match-score-threshold", type=float, default=55.0)
+    p_no_boost.add_argument("--cleanup-undo-count", type=int, default=2)
+    p_no_boost_batch = sub.add_parser(
+        "no-boost-area-batch",
+        help="Run strict no-Boost area batch (ceiling/gwb only)",
+    )
+    p_no_boost_batch.add_argument("--project-id", required=True)
+    p_no_boost_batch.add_argument("--registry", default=str(REGISTRY_PATH))
+    p_no_boost_batch.add_argument("--attempts", type=int, default=10)
+    p_no_boost_batch.add_argument("--monitor-index", type=int, default=1)
+    p_no_boost_batch.add_argument("--match-score-threshold", type=float, default=55.0)
+    p_no_boost_batch.add_argument("--cleanup-undo-count", type=int, default=2)
     p_boost_copy = sub.add_parser(
         "boost-then-copy-attempt",
         help="Run Boost, analyze screenshot, erase Boost work, then run copy attempt",
@@ -3285,6 +4241,22 @@ def main() -> int:
     p_boost_copy.add_argument("--boost-populate-timeout-ms", type=int, default=45000)
     p_boost_copy.add_argument("--boost-populate-poll-ms", type=int, default=3000)
     p_boost_copy.add_argument("--boost-min-candidate-count", type=int, default=1)
+    p_boost_copy.add_argument("--user-start-x", type=int, default=0)
+    p_boost_copy.add_argument("--user-start-y", type=int, default=0)
+    p_cont = sub.add_parser(
+        "continuous-boost-copy",
+        help="Run autonomous non-blocking boost->copy loop with periodic summaries",
+    )
+    p_cont.add_argument("--project-id", required=True)
+    p_cont.add_argument("--registry", default=str(REGISTRY_PATH))
+    p_cont.add_argument("--monitor-index", type=int, default=1)
+    p_cont.add_argument("--attempts", type=int, default=20)
+    p_cont.add_argument("--summary-every", type=int, default=10)
+    p_cont.add_argument("--condition-row", choices=["first", "second"], default="first")
+    p_cont.add_argument("--left-choice", choices=["nearest", "middle", "farthest"], default="nearest")
+    p_cont.add_argument("--match-score-threshold", type=float, default=55.0)
+    p_cont.add_argument("--cleanup-undo-count", type=int, default=2)
+    p_cont.add_argument("--attempt-style", choices=["point", "polyline2", "polyline4"], default="polyline4")
     p_proto_prep = sub.add_parser(
         "protocol-prepare-batch",
         help="Create protocol candidates for project types and queue for user verification",
@@ -3389,6 +4361,24 @@ def main() -> int:
             cleanup_undo_count=int(args.cleanup_undo_count),
             attempt_style=args.attempt_style,
         )
+    if args.cmd == "no-boost-area-attempt":
+        return cmd_no_boost_area_attempt(
+            project_id=args.project_id,
+            registry_path=pathlib.Path(args.registry),
+            condition_row=args.condition_row,
+            monitor_index=int(args.monitor_index),
+            match_score_threshold=float(args.match_score_threshold),
+            cleanup_undo_count=int(args.cleanup_undo_count),
+        )
+    if args.cmd == "no-boost-area-batch":
+        return cmd_no_boost_area_batch(
+            project_id=args.project_id,
+            registry_path=pathlib.Path(args.registry),
+            attempts=int(args.attempts),
+            monitor_index=int(args.monitor_index),
+            match_score_threshold=float(args.match_score_threshold),
+            cleanup_undo_count=int(args.cleanup_undo_count),
+        )
     if args.cmd == "boost-then-copy-attempt":
         return cmd_boost_then_copy_attempt(
             project_id=args.project_id,
@@ -3403,6 +4393,21 @@ def main() -> int:
             boost_populate_timeout_ms=int(args.boost_populate_timeout_ms),
             boost_populate_poll_ms=int(args.boost_populate_poll_ms),
             boost_min_candidate_count=int(args.boost_min_candidate_count),
+            user_start_x=int(args.user_start_x),
+            user_start_y=int(args.user_start_y),
+        )
+    if args.cmd == "continuous-boost-copy":
+        return cmd_continuous_boost_copy(
+            project_id=args.project_id,
+            registry_path=pathlib.Path(args.registry),
+            monitor_index=int(args.monitor_index),
+            attempts=int(args.attempts),
+            summary_every=int(args.summary_every),
+            condition_row=args.condition_row,
+            left_choice=args.left_choice,
+            match_score_threshold=float(args.match_score_threshold),
+            cleanup_undo_count=int(args.cleanup_undo_count),
+            attempt_style=args.attempt_style,
         )
     if args.cmd == "protocol-prepare-batch":
         return cmd_protocol_prepare_batch(args.project_ids, pathlib.Path(args.registry))

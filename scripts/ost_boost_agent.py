@@ -30,7 +30,6 @@ try:
     import mss
     import numpy as np
     import pyautogui
-    import pygetwindow as gw
     import pytesseract
 except Exception as exc:  # pragma: no cover
     print(
@@ -41,6 +40,11 @@ except Exception as exc:  # pragma: no cover
     raise
 
 from mouse_takeover_guard import install_pyautogui_takeover_guard
+from ost_window_guard import (
+    clamp_point_to_active_window,
+    focus_window as focus_window_guard,
+    set_active_window_rect,
+)
 
 install_pyautogui_takeover_guard(pyautogui)
 
@@ -136,22 +140,7 @@ def sleep_ms(ms: int) -> None:
 
 
 def focus_ost_window(title_contains: str) -> bool:
-    candidates = []
-    for w in gw.getAllWindows():
-        title = (w.title or "").strip()
-        if title_contains.lower() in title.lower():
-            candidates.append(w)
-    if not candidates:
-        return False
-    win = candidates[0]
-    try:
-        if win.isMinimized:
-            win.restore()
-        win.activate()
-        time.sleep(0.25)
-        return True
-    except Exception:
-        return False
+    return focus_window_guard(title_contains, sleep_s=0.25)
 
 
 def screenshot_monitor(monitor_index: int, out_file: pathlib.Path) -> pathlib.Path:
@@ -301,7 +290,10 @@ def release_modifier_keys() -> None:
 
 def click_point(pt: Point, click_delay_ms: int) -> None:
     release_modifier_keys()
-    pyautogui.moveTo(pt.x, pt.y, duration=0.15)
+    cx, cy, adjusted = clamp_point_to_active_window(pt.x, pt.y, margin_px=10)
+    if adjusted:
+        print(f"ost_window_clamp from=({pt.x},{pt.y}) to=({cx},{cy})")
+    pyautogui.moveTo(cx, cy, duration=0.15)
     pyautogui.click()
     release_modifier_keys()
     sleep_ms(click_delay_ms)
@@ -528,6 +520,7 @@ def run_boost(config_path: pathlib.Path, dry_run: bool = False, project_id: str 
             print(f"Maverick log: {json.dumps(mav)}")
         return 3
 
+    set_active_window_rect(title)
     monitor_rect = get_monitor_rect(monitor_index)
     boost_button = to_point(anchors["boost_button"])
     boost_run_button = to_point(anchors["boost_run_button"])

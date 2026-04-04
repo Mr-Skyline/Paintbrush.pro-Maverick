@@ -20,11 +20,11 @@ import mss
 import pyautogui
 
 from mouse_takeover_guard import install_pyautogui_takeover_guard
-
-try:
-    import pygetwindow as gw  # type: ignore
-except Exception:  # pragma: no cover
-    gw = None
+from ost_window_guard import (
+    clamp_point_to_active_window,
+    focus_window as focus_ost_window,
+    set_active_window_rect,
+)
 
 install_pyautogui_takeover_guard(pyautogui)
 
@@ -44,23 +44,6 @@ def write_json(path: pathlib.Path, data: Dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
-def focus_window(title_contains: str) -> bool:
-    if gw is None:
-        return False
-    try:
-        wins = gw.getWindowsWithTitle(title_contains)
-        if not wins:
-            return False
-        w = wins[0]
-        if w.isMinimized:
-            w.restore()
-        w.activate()
-        time.sleep(0.35)
-        return True
-    except Exception:
-        return False
-
-
 def screenshot_monitor(monitor_index: int, out_file: pathlib.Path) -> None:
     out_file.parent.mkdir(parents=True, exist_ok=True)
     with mss.mss() as sct:
@@ -75,10 +58,13 @@ def click_anchor(anchors: Dict[str, Any], name: str, delay_s: float = 0.45) -> D
     pt = anchors.get(name, {})
     x = int(pt.get("x", 0))
     y = int(pt.get("y", 0))
-    pyautogui.moveTo(x, y, duration=0.15)
+    cx, cy, adjusted = clamp_point_to_active_window(x, y, margin_px=10)
+    if adjusted:
+        print(f"ost_window_clamp anchor={name} from=({x},{y}) to=({cx},{cy})")
+    pyautogui.moveTo(cx, cy, duration=0.15)
     pyautogui.click()
     time.sleep(delay_s)
-    return {"anchor": name, "x": x, "y": y}
+    return {"anchor": name, "x": cx, "y": cy}
 
 
 def run_item_type_classifier(
@@ -151,7 +137,8 @@ def run_attempts(
         print(f"Missing anchors: {missing}")
         return 2
 
-    focused = focus_window(window_title_contains)
+    focused = focus_ost_window(window_title_contains)
+    set_active_window_rect(window_title_contains)
     out_dir.mkdir(parents=True, exist_ok=True)
     events: List[Dict[str, Any]] = []
 

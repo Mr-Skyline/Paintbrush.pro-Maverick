@@ -26,6 +26,7 @@
     {
       "id": "T01-linear-baseline-L1",
       "goal": "Draw one linear condition end-to-end with stable completion.",
+      "trade_focus": ["drywall", "trim", "wood_base"],
       "core_skills": ["open project", "select condition", "linear trace", "verify qty"],
       "expected_outputs": ["line markups", "qty update in condition tree"],
       "pass_criteria": ["step completion >= 100%", "qty error <= 2%"]
@@ -33,6 +34,7 @@
     {
       "id": "T02-area-baseline-L1",
       "goal": "Create one closed area condition and verify area quantity.",
+      "trade_focus": ["painting", "wallcovering", "ceilings"],
       "core_skills": ["select area tool", "close polygon", "verify qty"],
       "expected_outputs": ["filled area markup", "qty update"],
       "pass_criteria": ["no orphaned area", "qty error <= 2%"]
@@ -40,6 +42,7 @@
     {
       "id": "T03-count-baseline-L1",
       "goal": "Execute count takeoff with target symbols.",
+      "trade_focus": ["doors", "door_frames"],
       "core_skills": ["select count condition", "place count points", "verify count"],
       "expected_outputs": ["count marks", "count qty update"],
       "pass_criteria": ["count variance <= 1 item"]

@@ -30,6 +30,11 @@ except Exception as exc:  # pragma: no cover
     raise
 
 from mouse_takeover_guard import install_pyautogui_takeover_guard
+from ost_window_guard import (
+    clamp_point_to_active_window,
+    focus_window as focus_window_guard,
+    set_active_window_rect,
+)
 
 install_pyautogui_takeover_guard(pyautogui)
 
@@ -122,22 +127,7 @@ def first_upload_file(folder: pathlib.Path) -> pathlib.Path | None:
 
 
 def focus_window(title_contains: str) -> bool:
-    candidates = []
-    for w in gw.getAllWindows():
-        title = (w.title or "").strip()
-        if title_contains.lower() in title.lower():
-            candidates.append(w)
-    if not candidates:
-        return False
-    win = candidates[0]
-    try:
-        if win.isMinimized:
-            win.restore()
-        win.activate()
-        time.sleep(0.25)
-        return True
-    except Exception:
-        return False
+    return focus_window_guard(title_contains, sleep_s=0.25)
 
 
 def screenshot_monitor(monitor_index: int, out_file: pathlib.Path) -> pathlib.Path:
@@ -154,7 +144,10 @@ def screenshot_monitor(monitor_index: int, out_file: pathlib.Path) -> pathlib.Pa
 
 
 def click_point(x: int, y: int, delay_ms: int, double: bool = False) -> None:
-    pyautogui.moveTo(x, y, duration=0.15)
+    cx, cy, adjusted = clamp_point_to_active_window(int(x), int(y), margin_px=10)
+    if adjusted:
+        print(f"ost_window_clamp from=({int(x)},{int(y)}) to=({cx},{cy})")
+    pyautogui.moveTo(cx, cy, duration=0.15)
     if double:
         pyautogui.doubleClick()
     else:
@@ -278,6 +271,7 @@ def run_setup(
     }
 
     focused = focus_window(title)
+    set_active_window_rect(title)
     actions.append({"step": "focus_window", "ok": focused, "title_contains": title})
     screenshot_monitor(monitor_index, out_dir / "01_before.png")
     if not focused:

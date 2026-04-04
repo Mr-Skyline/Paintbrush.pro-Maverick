@@ -837,6 +837,13 @@ class MaverickRuntime:
         stability_values: List[float] = []
         classifier_confidence_values: List[float] = []
         copy_match_values: List[float] = []
+        geometry_values: List[float] = []
+        finish_inference_conf_values: List[float] = []
+        area_style_hits = 0
+        allowed_condition_hits = 0
+        runtime_latency_values: List[float] = []
+        condition_lock_hits = 0
+        teacher_extraction_hits = 0
         cleanup_event_count = 0
         copy_attempt_count = 0
         for row in selected_rows:
@@ -862,18 +869,43 @@ class MaverickRuntime:
                     classifier_confidence_values.append(float(top_conf))
             except Exception:
                 pass
+            try:
+                fin_conf = float((comps or {}).get("finish_inference_confidence", 0.0) or 0.0)
+                if fin_conf > 0:
+                    finish_inference_conf_values.append(fin_conf)
+            except Exception:
+                pass
             copy_summary = row.get("takeoff_copy_summary", {}) if isinstance(row, dict) else {}
             if isinstance(copy_summary, dict):
+                style_now = str(copy_summary.get("condition_style", "") or "").lower()
+                if style_now == "area":
+                    area_style_hits += 1
+                active_condition_name = str(copy_summary.get("active_condition_name", "") or "").lower()
+                if ("ceiling" in active_condition_name) or ("gwb" in active_condition_name):
+                    allowed_condition_hits += 1
+                try:
+                    runtime_latency_values.append(float(copy_summary.get("runtime_ms", 0.0) or 0.0))
+                except Exception:
+                    pass
                 ma = copy_summary.get("match_assessment", {})
                 if isinstance(ma, dict):
                     try:
                         copy_match_values.append(float(ma.get("score", 0.0) or 0.0))
                     except Exception:
                         pass
+                    try:
+                        geometry_values.append(float(ma.get("geometry_score", 0.0) or 0.0))
+                    except Exception:
+                        pass
+                    if str(ma.get("teacher_target_id", "") or "").strip():
+                        teacher_extraction_hits += 1
                     copy_attempt_count += 1
                 cleanup = copy_summary.get("cleanup", {})
                 if isinstance(cleanup, dict) and bool(cleanup.get("ran", False)):
                     cleanup_event_count += 1
+                cv = copy_summary.get("condition_verification", {})
+                if isinstance(cv, dict) and bool(cv.get("ok", False)) and bool(cv.get("row_index_match", False)):
+                    condition_lock_hits += 1
 
         def stats(vals: List[float]) -> Dict[str, float]:
             if not vals:
@@ -893,6 +925,9 @@ class MaverickRuntime:
         s_stats = stats(stability_values)
         classifier_stats = stats(classifier_confidence_values)
         copy_match_stats = stats(copy_match_values)
+        geometry_stats = stats(geometry_values)
+        finish_conf_stats = stats(finish_inference_conf_values)
+        latency_stats = stats(runtime_latency_values)
         takeoff_accuracy_variance_status = "pass"
         if q_stats["count"] >= 2:
             if q_stats["stdev"] > 20 or (q_stats["max"] - q_stats["min"]) > 30:
@@ -906,6 +941,25 @@ class MaverickRuntime:
         copy_match_status = "pass"
         if copy_match_stats["count"] >= 1 and copy_match_stats["avg"] < 55.0:
             copy_match_status = "warn"
+        geometry_status = "pass"
+        if geometry_stats["count"] >= 1 and geometry_stats["avg"] < 0.55:
+            geometry_status = "warn"
+        finish_inference_status = "pass"
+        if finish_conf_stats["count"] >= 1 and finish_conf_stats["avg"] < 0.45:
+            finish_inference_status = "warn"
+        area_style_correctness_rate = round((area_style_hits / max(1, copy_attempt_count)), 3)
+        condition_name_correctness_rate = round((allowed_condition_hits / max(1, copy_attempt_count)), 3)
+        area_style_status = "pass" if (copy_attempt_count == 0 or area_style_correctness_rate >= 0.98) else "warn"
+        condition_name_status = "pass" if (copy_attempt_count == 0 or condition_name_correctness_rate >= 0.98) else "warn"
+        latency_status = "pass"
+        latency_band = "balanced_ok"
+        if latency_stats["count"] >= 1:
+            avg_ms = float(latency_stats.get("avg", 0.0) or 0.0)
+            if avg_ms > 45000:
+                latency_status = "warn"
+                latency_band = "high_latency"
+            elif avg_ms < 5000:
+                latency_band = "very_fast"
 
         # Missing work-package coverage heuristic:
         # If scope profiles indicate work packages but no training attempts exist, flag as warn.
@@ -930,6 +984,52 @@ class MaverickRuntime:
         work_package_coverage_status = "pass"
         if projects_with_work_packages > 0 and len(selected_rows) == 0:
             work_package_coverage_status = "warn"
+        condition_lock_rate = round((condition_lock_hits / max(1, copy_attempt_count)), 3)
+        teacher_rate = round((teacher_extraction_hits / max(1, copy_attempt_count)), 3)
+        acceptance_thresholds = {
+            "condition_lock_success_min": 0.95,
+            "geometry_avg_min": 0.55,
+            "copy_match_avg_min": 55.0,
+            "finish_inference_confidence_min": 0.45,
+            "area_style_correctness_min": 0.98,
+            "condition_name_correctness_min": 0.98,
+            "runtime_latency_avg_max_ms": 45000.0,
+        }
+        rollout_gate = {
+            "condition_lock_pass": bool(condition_lock_rate >= acceptance_thresholds["condition_lock_success_min"]),
+            "geometry_pass": bool(float(geometry_stats.get("avg", 0.0) or 0.0) >= acceptance_thresholds["geometry_avg_min"]),
+            "copy_match_pass": bool(float(copy_match_stats.get("avg", 0.0) or 0.0) >= acceptance_thresholds["copy_match_avg_min"]),
+            "finish_inference_pass": bool(
+                float(finish_conf_stats.get("avg", 0.0) or 0.0) >= acceptance_thresholds["finish_inference_confidence_min"]
+                if float(finish_conf_stats.get("count", 0.0) or 0.0) > 0
+                else True
+            ),
+            "area_style_pass": bool(
+                area_style_correctness_rate >= acceptance_thresholds["area_style_correctness_min"]
+                if copy_attempt_count > 0
+                else True
+            ),
+            "condition_name_pass": bool(
+                condition_name_correctness_rate >= acceptance_thresholds["condition_name_correctness_min"]
+                if copy_attempt_count > 0
+                else True
+            ),
+            "latency_pass": bool(
+                float(latency_stats.get("avg", 0.0) or 0.0) <= acceptance_thresholds["runtime_latency_avg_max_ms"]
+                if float(latency_stats.get("count", 0.0) or 0.0) > 0
+                else True
+            ),
+        }
+        rollout_gate["ready"] = bool(all(rollout_gate.values()))
+
+        finish_review_queue = self.root / "output/ost-training-lab/review_queue/finish_review_queue.json"
+        review_pending = 0
+        if finish_review_queue.exists():
+            data = read_json(finish_review_queue, {})
+            if isinstance(data, dict):
+                items = data.get("items", [])
+                if isinstance(items, list):
+                    review_pending = len(items)
 
         return {
             "attempt_count": len(selected_rows),
@@ -943,8 +1043,24 @@ class MaverickRuntime:
             "item_type_classifier_confidence_status": classifier_confidence_status,
             "takeoff_copy_match_score": copy_match_stats,
             "takeoff_copy_match_status": copy_match_status,
+            "takeoff_copy_geometry_score": geometry_stats,
+            "takeoff_copy_geometry_status": geometry_status,
+            "finish_inference_confidence": finish_conf_stats,
+            "finish_inference_status": finish_inference_status,
+            "area_style_correctness_rate": area_style_correctness_rate,
+            "area_style_status": area_style_status,
+            "condition_name_correctness_rate": condition_name_correctness_rate,
+            "condition_name_status": condition_name_status,
+            "runtime_latency_ms": latency_stats,
+            "runtime_latency_status": latency_status,
+            "runtime_latency_band": latency_band,
             "takeoff_copy_attempt_count": copy_attempt_count,
+            "condition_lock_success_rate": condition_lock_rate,
+            "teacher_extraction_success_rate": teacher_rate,
             "takeoff_copy_cleanup_events": cleanup_event_count,
+            "finish_review_queue_pending": review_pending,
+            "acceptance_thresholds": acceptance_thresholds,
+            "rollout_gate": rollout_gate,
             "scope_projects": scope_projects,
             "projects_with_work_packages": projects_with_work_packages,
             "work_package_coverage_status": work_package_coverage_status,
@@ -971,7 +1087,14 @@ class MaverickRuntime:
             f"runtime_stability={eqa['runtime_stability_status']} "
             f"work_package_coverage={eqa['work_package_coverage_status']} "
             f"classifier_confidence={eqa.get('item_type_classifier_confidence_status', 'pass')} "
-            f"takeoff_copy_match={eqa.get('takeoff_copy_match_status', 'pass')}\n"
+            f"takeoff_copy_match={eqa.get('takeoff_copy_match_status', 'pass')} "
+            f"geometry={eqa.get('takeoff_copy_geometry_status', 'pass')} "
+            f"finish_inference={eqa.get('finish_inference_status', 'pass')} "
+            f"area_style={eqa.get('area_style_status', 'pass')} "
+            f"condition_name={eqa.get('condition_name_status', 'pass')} "
+            f"latency={eqa.get('runtime_latency_status', 'pass')}({eqa.get('runtime_latency_band', 'balanced_ok')}) "
+            f"rollout_ready={((eqa.get('rollout_gate') or {}).get('ready', False))}\n"
+            f"- review_queue: finish_pending={eqa.get('finish_review_queue_pending', 0)}\n"
         )
         if q["warnings"]:
             summary += "- warnings:\n"
@@ -1233,6 +1356,24 @@ class MaverickRuntime:
                     "action": "Review takeoff copy mismatch attempts and refine blank-drawing target selection before reruns.",
                     "priority": 84 + min(10, int(max(0.0, (55.0 - copy_avg)) // 5)),
                     "reason": "takeoff_copy_match_warn",
+                }
+            )
+        if eqa.get("takeoff_copy_geometry_status") == "warn":
+            geom_avg = float(((eqa.get("takeoff_copy_geometry_score") or {}).get("avg", 0.0) or 0.0))
+            action_candidates.append(
+                {
+                    "action": "Re-align copy strokes to Boost teacher geometry and enforce corner-first tracing.",
+                    "priority": 86 + min(10, int(max(0.0, (0.55 - geom_avg)) * 20)),
+                    "reason": "takeoff_copy_geometry_warn",
+                }
+            )
+        lock_rate = float(eqa.get("condition_lock_success_rate", 0.0) or 0.0)
+        if lock_rate < 0.95:
+            action_candidates.append(
+                {
+                    "action": "Tighten conditions-pane OCR lock and reject ambiguous ceiling/GWB rows.",
+                    "priority": 92 + min(6, int((0.95 - max(0.0, lock_rate)) * 20)),
+                    "reason": "condition_lock_success_below_target",
                 }
             )
         if eqa.get("work_package_coverage_status") == "warn":

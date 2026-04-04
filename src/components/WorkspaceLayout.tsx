@@ -155,6 +155,7 @@ export function WorkspaceLayout() {
 
   const onDropPdf = async (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     const f = e.dataTransfer.files?.[0];
     if (!f || !/\.pdf$/i.test(f.name) || !projectId) return;
     try {
@@ -220,7 +221,14 @@ export function WorkspaceLayout() {
   return (
     <div
       className="flex h-full flex-col"
-      onDragOver={(e) => e.preventDefault()}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
       onDrop={onDropPdf}
     >
       <ToolbarOST

@@ -3,8 +3,23 @@ import { ProjectListScreen } from '@/screens/ProjectListScreen';
 import { NewProjectScreen } from '@/screens/NewProjectScreen';
 import { WorkspaceLayout } from '@/components/WorkspaceLayout';
 import { DesktopInvoiceScreen } from '@/screens/DesktopInvoiceScreen';
+import { BattleshipLabScreen } from '@/screens/BattleshipLabScreen';
+import { useEffect } from 'react';
 
 export default function App() {
+  useEffect(() => {
+    const guard = (e: DragEvent) => {
+      // Prevent browser default "open file in tab" behavior.
+      e.preventDefault();
+    };
+    window.addEventListener('dragover', guard);
+    window.addEventListener('drop', guard);
+    return () => {
+      window.removeEventListener('dragover', guard);
+      window.removeEventListener('drop', guard);
+    };
+  }, []);
+
   if (window.desktopApi) {
     return <DesktopInvoiceScreen />;
   }
@@ -16,6 +31,7 @@ export default function App() {
       {screen === 'projects' && <ProjectListScreen />}
       {screen === 'new-project' && <NewProjectScreen />}
       {screen === 'workspace' && <WorkspaceLayout />}
+      {screen === 'battleship-lab' && <BattleshipLabScreen />}
     </div>
   );
 }

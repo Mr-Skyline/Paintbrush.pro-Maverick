@@ -10,6 +10,7 @@ export function ProjectListScreen() {
     Awaited<ReturnType<typeof listRegistry>>
   >([]);
   const goNew = useNavigationStore((s) => s.goToNewProject);
+  const goBattleshipLab = useNavigationStore((s) => s.goToBattleshipLab);
   const openWorkspace = useNavigationStore((s) => s.openWorkspace);
 
   const refresh = () => {
@@ -58,6 +59,13 @@ export function ProjectListScreen() {
             className="rounded-lg border border-ost-border px-4 py-2 text-sm hover:bg-white/5"
           >
             Link workspace folder…
+          </button>
+          <button
+            type="button"
+            onClick={goBattleshipLab}
+            className="rounded-lg border border-indigo-500/40 bg-indigo-600/20 px-4 py-2 text-sm hover:bg-indigo-500/30"
+          >
+            Battleship AI Lab
           </button>
           <button
             type="button"

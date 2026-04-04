@@ -2,10 +2,14 @@
   "fallback_to_tesseract": true,
   "glmocr": {
     "enabled": true,
-    "endpoint": "http://127.0.0.1:8000/ocr",
-    "api_style": "http_json",
-    "model": "glm-ocr",
-    "timeout_s": 3.0,
+    "endpoint": "https://api.z.ai/api/coding/paas/v4",
+    "api_style": "openai_chat_completions",
+    "model": "GLM-4.6V",
+    "model_fallbacks": [
+      "GLM-4V",
+      "GLM-4.7"
+    ],
+    "timeout_s": 8.0,
     "retries": 1,
     "api_key": ""
   },

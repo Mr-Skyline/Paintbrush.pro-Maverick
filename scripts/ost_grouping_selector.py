@@ -23,6 +23,11 @@ import pytesseract
 
 from mouse_takeover_guard import install_pyautogui_takeover_guard
 from ocr_engine import create_ocr_engine, OcrEngine
+from ost_window_guard import (
+    clamp_point_to_active_window,
+    focus_window as focus_window_guard,
+    set_active_window_rect,
+)
 
 install_pyautogui_takeover_guard(pyautogui)
 
@@ -461,13 +466,17 @@ def maybe_click(target: Dict[str, Any] | None, click: bool) -> None:
     pt = target.get("center_global", {})
     x = int(pt.get("x", 0))
     y = int(pt.get("y", 0))
-    pyautogui.moveTo(x, y, duration=0.2)
+    cx, cy, adjusted = clamp_point_to_active_window(x, y, margin_px=10)
+    if adjusted:
+        print(f"ost_window_clamp from=({x},{y}) to=({cx},{cy})")
+    pyautogui.moveTo(cx, cy, duration=0.2)
     pyautogui.click()
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Select best takeoff grouping on current OST page")
     parser.add_argument("--monitor-index", type=int, default=1)
+    parser.add_argument("--window-title-contains", default="On-Screen Takeoff")
     parser.add_argument("--unit-label", default="", help="Optional unit label filter, e.g. unit-b2")
     parser.add_argument(
         "--unit-aliases",
@@ -481,6 +490,8 @@ def main() -> int:
         help="Where to write analysis JSON",
     )
     args = parser.parse_args()
+    focus_window_guard(str(args.window_title_contains), sleep_s=0.2)
+    set_active_window_rect(str(args.window_title_contains))
     _ = configure_tesseract()
     aliases = load_unit_aliases(pathlib.Path(args.unit_aliases))
     ocr = create_ocr_engine()
