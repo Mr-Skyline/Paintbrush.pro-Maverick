@@ -12,3 +12,5 @@ dist/
 *token*.txt
 *api*.txt
 telegram*.txt
+__pycache__/
+*.pyc
