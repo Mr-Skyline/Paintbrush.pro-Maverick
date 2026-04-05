@@ -107,6 +107,17 @@ def _filter_rows_by_events(
     return out
 
 
+def _filter_rows_by_session(
+    rows: list[dict[str, Any]], session_id: str | None
+) -> list[dict[str, Any]]:
+    if session_id is None:
+        return rows
+    want = session_id.strip()
+    if not want:
+        return rows
+    return [r for r in rows if _session_key(r) == want]
+
+
 def _iter_ngrams(
     names: list[str], n: int
 ) -> Iterable[tuple[tuple[str, ...], int]]:
@@ -372,6 +383,7 @@ def _format_pattern_block(
 def _filter_description_lines(
     include_events: frozenset[str] | None,
     exclude_events: frozenset[str] | None,
+    session_id: str | None = None,
 ) -> list[str]:
     out: list[str] = []
     if include_events is not None:
@@ -380,6 +392,8 @@ def _filter_description_lines(
     if exclude_events is not None:
         listed = ", ".join(f"`{x}`" for x in sorted(exclude_events))
         out.append(f"- **Event exclude filter:** {listed}")
+    if session_id is not None and session_id.strip():
+        out.append(f"- **sessionId filter:** `{session_id.strip()}`")
     return out
 
 
@@ -392,9 +406,13 @@ def generate_markdown(
     by_session: bool = False,
     include_events: frozenset[str] | None = None,
     exclude_events: frozenset[str] | None = None,
+    session_id: str | None = None,
 ) -> str:
     all_rows, malformed_lines = _load_trace(path)
-    rows = _filter_rows_by_events(all_rows, include_events, exclude_events)
+    rows_after_events = _filter_rows_by_events(
+        all_rows, include_events, exclude_events
+    )
+    rows = _filter_rows_by_session(rows_after_events, session_id)
 
     lines: list[str] = [
         "# Trace-derived rulebook (draft)",
@@ -447,9 +465,13 @@ def generate_markdown(
     lines.append("")
     lines.append(f"- **Source:** `{input_display}`")
     lines.append(f"- **Valid JSON rows (file):** {len(all_rows)}")
-    lines.append(f"- **Rows after event filters:** {len(rows)}")
+    lines.append(f"- **Rows after event filters:** {len(rows_after_events)}")
+    if session_id is not None and session_id.strip():
+        lines.append(f"- **Rows after sessionId filter:** {len(rows)}")
     lines.append(f"- **Malformed lines skipped:** {malformed_lines}")
-    lines.extend(_filter_description_lines(include_events, exclude_events))
+    lines.extend(
+        _filter_description_lines(include_events, exclude_events, session_id)
+    )
     lines.append(f"- **Unique event names (after filters):** {_unique_event_count(names)}")
     lines.append(
         f"- **Result tallies (after filters):** success={analysis.success_n}, "
@@ -552,6 +574,14 @@ def main() -> int:
         metavar="NAMES",
         help="Comma-separated event names: drop these events before mining and stats.",
     )
+    parser.add_argument(
+        "--session-id",
+        metavar="ID",
+        help=(
+            "If set, only rows whose sessionId matches this string (after trim) are used; "
+            "rows with empty sessionId are excluded."
+        ),
+    )
     args = parser.parse_args()
     if args.min_frequency < 1:
         print("--min-frequency must be at least 1", file=sys.stderr)
@@ -572,6 +602,7 @@ def main() -> int:
         by_session=args.by_session,
         include_events=include_set,
         exclude_events=exclude_set,
+        session_id=args.session_id,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(md, encoding="utf-8")
