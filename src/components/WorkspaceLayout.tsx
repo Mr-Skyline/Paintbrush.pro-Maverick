@@ -30,6 +30,8 @@ type WorkflowStepState = 'pending' | 'active' | 'complete';
 export function WorkspaceLayout() {
   const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
   const [boostOpen, setBoostOpen] = useState(false);
+  const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [uploadingSheets, setUploadingSheets] = useState(false);
   const [boostRunning, setBoostRunning] = useState(false);
   const [guideMessage, setGuideMessage] = useState<{
@@ -40,6 +42,10 @@ export function WorkspaceLayout() {
   const openProjectId = useNavigationStore((s) => s.openProjectId);
   const goProjects = useNavigationStore((s) => s.goToProjects);
   const activeDocumentId = useProjectStore((s) => s.activeDocumentId);
+  const leftCollapsed = useProjectStore((s) => s.leftCollapsed);
+  const toggleLeft = useProjectStore((s) => s.toggleLeft);
+  const rightOpen = useProjectStore((s) => s.rightOpen);
+  const toggleRight = useProjectStore((s) => s.toggleRight);
   const currentPage = useProjectStore((s) => s.currentPage);
   const conditions = useProjectStore((s) => s.conditions);
   const setBoostReview = useProjectStore((s) => s.setBoostReview);
@@ -380,24 +386,60 @@ export function WorkspaceLayout() {
         onExportPaintbrush={exportPb}
         onDownloadZip={downloadZip}
       />
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ost-border bg-ost-panel/90 px-2 py-1 text-[11px]">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleLeft}
+            className="rounded border border-ost-border px-1.5 py-0.5 text-ost-muted hover:bg-white/10"
+          >
+            {leftCollapsed ? 'Show plans panel' : 'Hide plans panel'}
+          </button>
+          <button
+            type="button"
+            onClick={toggleRight}
+            className="rounded border border-ost-border px-1.5 py-0.5 text-ost-muted hover:bg-white/10"
+          >
+            {rightOpen ? 'Hide inspector' : 'Show inspector'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setWorkflowOpen((v) => !v)}
+            className="rounded border border-ost-border px-1.5 py-0.5 text-ost-muted hover:bg-white/10"
+          >
+            {workflowOpen ? 'Hide workflow' : 'Show workflow'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setVoiceOpen((v) => !v)}
+            className="rounded border border-ost-border px-1.5 py-0.5 text-ost-muted hover:bg-white/10"
+          >
+            {voiceOpen ? 'Hide voice' : 'Show voice'}
+          </button>
+        </div>
+        <span className="text-ost-muted">
+          Focus mode: canvas-first layout with optional panels
+        </span>
+      </div>
       <div className="flex min-h-0 flex-1">
         <SidebarLeft />
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b border-ost-border bg-gradient-to-b from-[#111723] to-[#0f141d] px-3 py-3 text-xs">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-[320px]">
+          {workflowOpen && (
+            <div className="border-b border-ost-border bg-gradient-to-b from-[#111723] to-[#0f141d] px-2 py-2 text-[11px]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-[320px]">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-ost-muted">
                   Guided takeoff workflow
                 </p>
-                <h2 className="mt-1 text-base font-semibold text-slate-100">
+                <h2 className="mt-1 text-sm font-semibold text-slate-100">
                   {projectName || 'Untitled project'} · Sheet {totalPages ? currentPage : '—'} /{' '}
                   {totalPages || '—'}
                 </h2>
-                <ol className="mt-2 grid gap-1.5 md:grid-cols-2">
+                <ol className="mt-1.5 grid gap-1 md:grid-cols-2">
                   {workflowSteps.map((step, idx) => (
                     <li
                       key={step.id}
-                      className={`rounded-md border px-2 py-1.5 ${
+                      className={`rounded-md border px-1.5 py-1 ${
                         step.state === 'complete'
                           ? 'border-emerald-700/50 bg-emerald-950/30 text-emerald-200'
                           : step.state === 'active'
@@ -405,74 +447,75 @@ export function WorkspaceLayout() {
                             : 'border-ost-border bg-black/20 text-ost-muted'
                       }`}
                     >
-                      <div className="font-medium">
+                      <div className="text-[11px] font-medium">
                         {idx + 1}. {step.label}
                       </div>
-                      <div className="text-[11px]">{step.detail}</div>
+                      <div className="text-[10px]">{step.detail}</div>
                     </li>
                   ))}
                 </ol>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={openPlanPicker}
+                    disabled={uploadingSheets}
+                    className="rounded-md border border-blue-500/40 bg-blue-600/15 px-2 py-1 text-[11px] font-medium text-blue-100 hover:bg-blue-600/25 disabled:opacity-50"
+                  >
+                    {uploadingSheets ? 'Uploading plans…' : 'Upload plans (PDF)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void runGuidedBoost()}
+                    disabled={!documents.length || boostRunning}
+                    className="rounded-md bg-emerald-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-600 disabled:opacity-40"
+                  >
+                    {boostRunning ? 'AI running…' : 'Run AI takeoff now'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBoostOpen(true)}
+                    disabled={!documents.length}
+                    className="rounded-md border border-ost-border px-2 py-1 text-[11px] text-ost-muted hover:bg-white/10 disabled:opacity-40"
+                  >
+                    Configure AI
+                  </button>
+                </div>
               </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={openPlanPicker}
-                  disabled={uploadingSheets}
-                  className="rounded-md border border-blue-500/40 bg-blue-600/15 px-3 py-2 text-xs font-medium text-blue-100 hover:bg-blue-600/25 disabled:opacity-50"
+              {guideMessage && (
+                <p
+                  className={`mt-2 ${
+                    guideMessage.tone === 'success'
+                      ? 'text-emerald-300'
+                      : guideMessage.tone === 'error'
+                        ? 'text-rose-300'
+                        : 'text-ost-muted'
+                  }`}
                 >
-                  {uploadingSheets ? 'Uploading plans…' : 'Upload plans (PDF)'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void runGuidedBoost()}
-                  disabled={!documents.length || boostRunning}
-                  className="rounded-md bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-40"
-                >
-                  {boostRunning ? 'AI running…' : 'Run AI takeoff now'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBoostOpen(true)}
-                  disabled={!documents.length}
-                  className="rounded-md border border-ost-border px-3 py-2 text-xs text-ost-muted hover:bg-white/10 disabled:opacity-40"
-                >
-                  Configure AI
-                </button>
-              </div>
+                  {guideMessage.text}
+                </p>
+              )}
+              {boostReview && (
+                <p className="mt-1 text-ost-muted">
+                  Latest AI result: <span className="text-slate-200">{boostReview.headline}</span>{' '}
+                  ({boostReview.findings.length} findings,{' '}
+                  {boostReview.suggestedConditions.length} suggested conditions)
+                </p>
+              )}
             </div>
-            {guideMessage && (
-              <p
-                className={`mt-2 ${
-                  guideMessage.tone === 'success'
-                    ? 'text-emerald-300'
-                    : guideMessage.tone === 'error'
-                      ? 'text-rose-300'
-                      : 'text-ost-muted'
-                }`}
-              >
-                {guideMessage.text}
-              </p>
-            )}
-            {boostReview && (
-              <p className="mt-1 text-ost-muted">
-                Latest AI result: <span className="text-slate-200">{boostReview.headline}</span>{' '}
-                ({boostReview.findings.length} findings,{' '}
-                {boostReview.suggestedConditions.length} suggested conditions)
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 border-b border-ost-border bg-ost-panel/70 px-3 py-2 text-xs text-ost-muted">
-            <span className="rounded-full border border-ost-border/70 bg-black/20 px-2 py-0.5">
+          )}
+          <div className="flex items-center gap-1.5 border-b border-ost-border bg-ost-panel/70 px-2 py-1 text-[11px] text-ost-muted">
+            <span className="rounded-full border border-ost-border/70 bg-black/20 px-1.5 py-0.5">
               Tip: drag &amp; drop PDFs anywhere in this workspace to append sheets
             </span>
-            <span className="rounded-full border border-ost-border/70 bg-black/20 px-2 py-0.5">
+            <span className="rounded-full border border-ost-border/70 bg-black/20 px-1.5 py-0.5">
               Use AI box tool to scope AI takeoff region
             </span>
           </div>
           <div className="min-h-0 flex-1 overflow-auto bg-[#0b1018] p-3">
             <CanvasWorkspace pdfData={pdfData} />
           </div>
-          <VoiceControls />
+          {voiceOpen && <VoiceControls />}
         </main>
         <RightSidebarProperties />
       </div>

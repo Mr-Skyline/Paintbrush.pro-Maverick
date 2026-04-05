@@ -26,16 +26,16 @@ export function ReviewPanel() {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 max-h-[48vh] overflow-hidden border-t border-violet-500/40 bg-gradient-to-b from-[#151a26] to-[#111722] shadow-2xl">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ost-border p-4">
+    <div className="fixed inset-x-0 bottom-0 z-50 max-h-[42vh] overflow-hidden border-t border-violet-500/40 bg-gradient-to-b from-[#151a26] to-[#111722] shadow-2xl">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ost-border p-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-300/90">
             AI findings
           </p>
-          <h3 className="text-lg font-semibold text-violet-100">
+          <h3 className="text-base font-semibold text-violet-100">
             AI Takeoff Review
           </h3>
-          <p className="mt-1 max-w-3xl text-sm text-ost-muted">{review.headline}</p>
+          <p className="mt-1 max-w-3xl text-xs text-ost-muted">{review.headline}</p>
           <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
             <span className="rounded-full border border-ost-border/80 bg-black/20 px-2 py-0.5 text-ost-muted">
               {review.findings.length} findings
@@ -45,11 +45,11 @@ export function ReviewPanel() {
             </span>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             onClick={approveAll}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500"
+            className="rounded-md bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-500"
           >
             Approve + draw all marks
           </button>
@@ -58,7 +58,7 @@ export function ReviewPanel() {
             onClick={() => {
               applyBoostConditions(review.suggestedConditions);
             }}
-            className="rounded-lg border border-ost-border px-3 py-2 text-sm hover:bg-white/5"
+            className="rounded-md border border-ost-border px-2.5 py-1.5 text-xs hover:bg-white/5"
           >
             Add conditions only
           </button>
@@ -68,13 +68,13 @@ export function ReviewPanel() {
               setReview(null);
               setReviewOpen(false);
             }}
-            className="rounded-lg px-3 py-2 text-sm text-ost-muted hover:bg-white/5"
+            className="rounded-md px-2.5 py-1.5 text-xs text-ost-muted hover:bg-white/5"
           >
             Dismiss
           </button>
         </div>
       </div>
-      <div className="overflow-y-auto p-4 text-sm">
+      <div className="overflow-y-auto p-3 text-sm">
         <ul className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
           {review.findings.slice(0, 60).map((f) => (
             <li

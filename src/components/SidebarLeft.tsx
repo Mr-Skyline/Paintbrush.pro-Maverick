@@ -86,7 +86,7 @@ export function SidebarLeft() {
             <button
               type="button"
               onClick={openUploadPicker}
-              className="mt-2 w-full rounded-md border border-blue-500/40 bg-blue-600/15 px-2 py-1.5 text-xs font-medium text-blue-100 hover:bg-blue-600/25"
+              className="mt-2 w-full rounded border border-blue-500/40 bg-blue-600/15 px-2 py-1 text-[11px] font-medium text-blue-100 hover:bg-blue-600/25"
             >
               + Upload plan PDFs
             </button>
@@ -101,7 +101,7 @@ export function SidebarLeft() {
                     <button
                       type="button"
                       onClick={() => setActiveDocument(d.id)}
-                      className={`w-full truncate rounded-md border px-2 py-1.5 text-left hover:bg-white/10 ${
+                      className={`w-full truncate rounded border px-2 py-1 text-left hover:bg-white/10 ${
                         d.id === activeDocumentId
                           ? 'border-emerald-600/60 bg-emerald-900/30 text-emerald-100'
                           : 'border-ost-border/60 bg-black/20 text-slate-300'
@@ -140,7 +140,7 @@ export function SidebarLeft() {
                     <button
                       type="button"
                       onClick={() => setPage(p)}
-                      className={`w-full rounded px-2 py-1 text-left text-xs hover:bg-white/10 ${
+                      className={`w-full rounded px-2 py-0.5 text-left text-xs hover:bg-white/10 ${
                         p === currentPage
                           ? 'border border-blue-600/70 bg-blue-600/25 text-white'
                           : 'border border-ost-border/60 bg-black/20'
@@ -190,7 +190,7 @@ export function SidebarLeft() {
                 resultKind: rk,
               });
             }}
-            className="rounded bg-blue-600 px-2 py-1 text-xs font-medium hover:bg-blue-500"
+            className="rounded bg-blue-600 px-2 py-0.5 text-[11px] font-medium hover:bg-blue-500"
           >
             + Add
           </button>
@@ -210,7 +210,7 @@ export function SidebarLeft() {
             <button
               type="button"
               onClick={(e) => toggleSel(c.id, e.ctrlKey || e.metaKey)}
-              className={`flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2 py-2 text-left text-sm transition ${
+              className={`flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm transition ${
                 selected.includes(c.id)
                   ? 'border-blue-500 bg-blue-600/20'
                   : 'border-ost-border/60 bg-black/20 hover:bg-white/5'
@@ -238,7 +238,7 @@ export function SidebarLeft() {
                 e.stopPropagation();
                 setEditingConditionId(c.id);
               }}
-              className="shrink-0 rounded-md border border-transparent px-2 py-2 text-ost-muted hover:border-ost-border hover:bg-white/10 hover:text-white"
+              className="shrink-0 rounded-md border border-transparent px-2 py-1.5 text-ost-muted hover:border-ost-border hover:bg-white/10 hover:text-white"
             >
               ✎
             </button>
