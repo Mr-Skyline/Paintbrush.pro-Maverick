@@ -7,6 +7,12 @@ import {
 } from '@/utils/conditionStyle';
 import { fabric } from 'fabric';
 
+function countBoostMarkersOnCanvas(c: fabric.Canvas): number {
+  return c.getObjects().filter(
+    (o) => (o as fabric.Object & { isBoost?: boolean }).isBoost
+  ).length;
+}
+
 function applyFinding(
   finding: BoostFinding,
   conditionId: string,
@@ -97,6 +103,8 @@ export function applyBoostReviewApproveAll(): {
   ok: boolean;
   error?: string;
   applied?: number;
+  markersBefore?: number;
+  markersAfter?: number;
 } {
   const st = useProjectStore.getState();
   const review = st.boostReview;
@@ -111,6 +119,7 @@ export function applyBoostReviewApproveAll(): {
   if (!c) {
     return { ok: false, error: 'Canvas not ready.' };
   }
+  const markersBefore = countBoostMarkersOnCanvas(c);
   st.applyBoostConditions(review.suggestedConditions);
   for (const f of review.findings) {
     const cond = ensureCondition(
@@ -124,10 +133,11 @@ export function applyBoostReviewApproveAll(): {
     if (cond) applyFinding(f, cond.id, cond.color);
   }
   const applied = review.findings.length;
+  const markersAfter = countBoostMarkersOnCanvas(c);
   st.setBoostReview(null);
   st.setReviewOpen(false);
   const snap = (window as unknown as { __takeoffPushUndoSnapshot?: () => void })
     .__takeoffPushUndoSnapshot;
   snap?.();
-  return { ok: true, applied };
+  return { ok: true, applied, markersBefore, markersAfter };
 }

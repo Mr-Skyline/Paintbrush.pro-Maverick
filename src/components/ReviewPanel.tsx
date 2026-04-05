@@ -1,3 +1,4 @@
+import { recordAgentTrace } from '@/lib/agentTrace';
 import { useProjectStore } from '@/store/projectStore';
 import { applyBoostReviewApproveAll } from '@/utils/boostReviewApply';
 
@@ -10,8 +11,22 @@ export function ReviewPanel() {
 
   if (!review || !reviewOpen) return null;
 
+  const findingsCount = review.findings.length;
+  const suggestedConditionsCount = review.suggestedConditions.length;
+
   const approveAll = () => {
     const r = applyBoostReviewApproveAll();
+    recordAgentTrace('outcome', 'review_approve_all', {
+      result: r.ok ? 'ok' : 'error',
+      context: {
+        findingsCount,
+        suggestedConditionsCount,
+        applied: r.applied,
+        markersBefore: r.markersBefore,
+        markersAfter: r.markersAfter,
+        ...(r.error ? { error: r.error } : {}),
+      },
+    });
     if (!r.ok) alert(r.error ?? 'Could not apply Boost review.');
   };
 
@@ -35,6 +50,10 @@ export function ReviewPanel() {
           <button
             type="button"
             onClick={() => {
+              recordAgentTrace('decision', 'review_add_conditions_only', {
+                result: 'ok',
+                context: { findingsCount, suggestedConditionsCount },
+              });
               applyBoostConditions(review.suggestedConditions);
             }}
             className="rounded-lg border border-ost-border px-3 py-2 text-sm hover:bg-white/5"
@@ -44,6 +63,10 @@ export function ReviewPanel() {
           <button
             type="button"
             onClick={() => {
+              recordAgentTrace('decision', 'review_dismiss', {
+                result: 'ok',
+                context: { findingsCount, suggestedConditionsCount },
+              });
               setReview(null);
               setReviewOpen(false);
             }}
