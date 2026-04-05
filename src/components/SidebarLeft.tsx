@@ -27,6 +27,9 @@ export function SidebarLeft() {
   const documents = useProjectStore((s) => s.documents);
   const activeDocumentId = useProjectStore((s) => s.activeDocumentId);
   const setActiveDocument = useProjectStore((s) => s.setActiveDocument);
+  const openUploadPicker = () => {
+    window.dispatchEvent(new Event('takeoff:open-upload-picker'));
+  };
   const [phaseOpen, setPhaseOpen] = useState(true);
   const [docsOpen, setDocsOpen] = useState(true);
   const [editingConditionId, setEditingConditionId] = useState<string | null>(
@@ -76,28 +79,39 @@ export function SidebarLeft() {
           <span className="text-ost-muted">{docsOpen ? '−' : '+'}</span>
         </button>
         {docsOpen && (
-          <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto text-xs">
-            {documents.length === 0 ? (
-              <li className="text-ost-muted">No sheets — drop on canvas.</li>
-            ) : (
-              documents.map((d) => (
-                <li key={d.id}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveDocument(d.id)}
-                    className={`w-full truncate rounded px-2 py-1 text-left hover:bg-white/10 ${
-                      d.id === activeDocumentId
-                        ? 'bg-emerald-900/40 text-emerald-200'
-                        : 'text-slate-300'
-                    }`}
-                  >
-                    {d.name}{' '}
-                    <span className="text-ost-muted">({d.pageCount} pg)</span>
-                  </button>
+          <>
+            <button
+              type="button"
+              onClick={openUploadPicker}
+              className="mt-2 w-full rounded border border-ost-border px-2 py-1 text-xs text-slate-300 hover:bg-white/10"
+            >
+              + Upload plan PDFs
+            </button>
+            <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto text-xs">
+              {documents.length === 0 ? (
+                <li className="text-ost-muted">
+                  No sheets yet. Upload PDFs to begin takeoff.
                 </li>
-              ))
-            )}
-          </ul>
+              ) : (
+                documents.map((d) => (
+                  <li key={d.id}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDocument(d.id)}
+                      className={`w-full truncate rounded px-2 py-1 text-left hover:bg-white/10 ${
+                        d.id === activeDocumentId
+                          ? 'bg-emerald-900/40 text-emerald-200'
+                          : 'text-slate-300'
+                      }`}
+                    >
+                      {d.name}{' '}
+                      <span className="text-ost-muted">({d.pageCount} pg)</span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </>
         )}
       </div>
 

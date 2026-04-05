@@ -22,13 +22,21 @@ import { findSimilarMarks } from '@/utils/findSimilar';
 import type { ExportRow } from '@/utils/exportTakeoff';
 import { fabric } from 'fabric';
 import { openPdfFromArrayBuffer } from '@/utils/openPdfFromArrayBuffer';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type BoostRunResult = { ok: boolean; error?: string; headline?: string };
+type WorkflowStepState = 'pending' | 'active' | 'complete';
 
 export function WorkspaceLayout() {
   const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
   const [boostOpen, setBoostOpen] = useState(false);
+  const [uploadingSheets, setUploadingSheets] = useState(false);
+  const [boostRunning, setBoostRunning] = useState(false);
+  const [guideMessage, setGuideMessage] = useState<{
+    tone: 'neutral' | 'success' | 'error';
+    text: string;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const openProjectId = useNavigationStore((s) => s.openProjectId);
   const goProjects = useNavigationStore((s) => s.goToProjects);
   const activeDocumentId = useProjectStore((s) => s.activeDocumentId);
@@ -39,6 +47,8 @@ export function WorkspaceLayout() {
   const totalPages = useProjectStore((s) => s.totalPages);
   const projectId = useProjectStore((s) => s.projectId);
   const documents = useProjectStore((s) => s.documents);
+  const boostReview = useProjectStore((s) => s.boostReview);
+  const reviewOpen = useProjectStore((s) => s.reviewOpen);
 
   useAutoSave(!!projectId);
 
@@ -100,6 +110,134 @@ export function WorkspaceLayout() {
     [pdfData, currentPage, conditions, setBoostReview]
   );
 
+  const openPlanPicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  useEffect(() => {
+    const onOpenPicker = () => openPlanPicker();
+    window.addEventListener('takeoff:open-upload-picker', onOpenPicker);
+    return () =>
+      window.removeEventListener('takeoff:open-upload-picker', onOpenPicker);
+  }, [openPlanPicker]);
+
+  const ingestPdfFiles = useCallback(
+    async (files: FileList | File[]) => {
+      if (!projectId) {
+        alert('Open or create a project first.');
+        return;
+      }
+      const pdfs = [...files].filter((f) => /\.pdf$/i.test(f.name));
+      if (!pdfs.length) {
+        alert('Please select one or more PDF plans.');
+        return;
+      }
+      setUploadingSheets(true);
+      setGuideMessage({ tone: 'neutral', text: 'Uploading plans…' });
+      try {
+        let added = 0;
+        for (const file of pdfs) {
+          const buf = await file.arrayBuffer();
+          const docId = crypto.randomUUID();
+          await savePdfBlob(projectId, docId, buf);
+          const doc = await openPdfFromArrayBuffer(buf);
+          useProjectStore.getState().addPdfDocument(docId, file.name, doc.numPages);
+          added += 1;
+        }
+        await saveProjectToIndexedDb();
+        setGuideMessage({
+          tone: 'success',
+          text: `Added ${added} plan${added === 1 ? '' : 's'}. Next: choose a sheet and run AI takeoff.`,
+        });
+      } catch (err) {
+        console.error(err);
+        setGuideMessage({
+          tone: 'error',
+          text: `Could not add plans: ${String(err)}`,
+        });
+      } finally {
+        setUploadingSheets(false);
+      }
+    },
+    [projectId]
+  );
+
+  const runGuidedBoost = useCallback(async () => {
+    if (!documents.length) {
+      setGuideMessage({ tone: 'error', text: 'Upload plans before running AI.' });
+      return;
+    }
+    setBoostRunning(true);
+    setGuideMessage({ tone: 'neutral', text: 'Running AI takeoff on current sheet…' });
+    const result = await runBoost('page');
+    if (result.ok) {
+      setGuideMessage({
+        tone: 'success',
+        text:
+          result.headline ??
+          'AI takeoff finished. Review and approve suggestions below.',
+      });
+      return;
+    }
+    setGuideMessage({
+      tone: 'error',
+      text: result.error ?? 'AI takeoff failed.',
+    });
+    setBoostRunning(false);
+  }, [documents.length, runBoost]);
+
+  useEffect(() => {
+    if (!boostRunning) return;
+    setBoostRunning(false);
+  }, [boostReview, boostRunning]);
+
+  const workflowSteps = useMemo(
+    () =>
+      [
+        {
+          id: 'upload',
+          label: 'Upload plans',
+          detail: documents.length
+            ? `${documents.length} PDF plan${documents.length === 1 ? '' : 's'} added`
+            : 'Add one or more PDF drawings',
+          state: documents.length ? 'complete' : 'active',
+        },
+        {
+          id: 'sheet',
+          label: 'Choose sheet',
+          detail:
+            documents.length && totalPages
+              ? `Sheet ${currentPage} of ${totalPages}`
+              : 'Pick a plan first',
+          state: documents.length ? 'complete' : 'pending',
+        },
+        {
+          id: 'run',
+          label: 'Run AI takeoff',
+          detail: boostReview
+            ? `${boostReview.findings.length} findings detected`
+            : 'Run AI on current sheet',
+          state: boostReview ? 'complete' : documents.length ? 'active' : 'pending',
+        },
+        {
+          id: 'review',
+          label: 'Review + apply',
+          detail: boostReview
+            ? reviewOpen
+              ? 'Review panel open below'
+              : 'Review panel completed/dismissed'
+            : 'Approve and draw suggested marks',
+          state: boostReview ? (reviewOpen ? 'active' : 'complete') : 'pending',
+        },
+      ] satisfies Array<{
+        id: string;
+        label: string;
+        detail: string;
+        state: WorkflowStepState;
+      }>,
+    [boostReview, currentPage, documents.length, reviewOpen, totalPages]
+  );
+
   useEffect(() => {
     setAgentHostHandlers({
       runBoost,
@@ -155,21 +293,8 @@ export function WorkspaceLayout() {
 
   const onDropPdf = async (e: React.DragEvent) => {
     e.preventDefault();
-    const f = e.dataTransfer.files?.[0];
-    if (!f || !/\.pdf$/i.test(f.name) || !projectId) return;
-    try {
-      const buf = await f.arrayBuffer();
-      const docId = crypto.randomUUID();
-      await savePdfBlob(projectId, docId, buf);
-      const doc = await openPdfFromArrayBuffer(buf);
-      useProjectStore.getState().addPdfDocument(docId, f.name, doc.numPages);
-      useProjectStore.getState().setActiveDocument(docId);
-      setPdfData(buf);
-      await saveProjectToIndexedDb();
-    } catch (err) {
-      console.error(err);
-      alert('Could not add PDF.');
-    }
+    if (!e.dataTransfer.files?.length) return;
+    await ingestPdfFiles(e.dataTransfer.files);
   };
 
   const saveManual = async () => {
@@ -223,6 +348,18 @@ export function WorkspaceLayout() {
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDropPdf}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = e.target.files;
+          if (files?.length) void ingestPdfFiles(files);
+          e.currentTarget.value = '';
+        }}
+      />
       <ToolbarOST
         onProjects={goProjects}
         onOpenBoost={() => setBoostOpen(true)}
@@ -234,8 +371,82 @@ export function WorkspaceLayout() {
       <div className="flex min-h-0 flex-1">
         <SidebarLeft />
         <main className="flex min-w-0 flex-1 flex-col">
+          <div className="border-b border-ost-border bg-ost-panel/80 px-2 py-2 text-xs">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-[280px]">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ost-muted">
+                  Guided takeoff workflow
+                </p>
+                <ol className="mt-1 grid gap-1 sm:grid-cols-2">
+                  {workflowSteps.map((step, idx) => (
+                    <li
+                      key={step.id}
+                      className={`rounded border px-2 py-1.5 ${
+                        step.state === 'complete'
+                          ? 'border-emerald-700/50 bg-emerald-950/30 text-emerald-200'
+                          : step.state === 'active'
+                            ? 'border-blue-700/50 bg-blue-950/30 text-blue-200'
+                            : 'border-ost-border bg-black/20 text-ost-muted'
+                      }`}
+                    >
+                      <div className="font-medium">
+                        {idx + 1}. {step.label}
+                      </div>
+                      <div className="text-[11px]">{step.detail}</div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={openPlanPicker}
+                  disabled={uploadingSheets}
+                  className="rounded border border-ost-border px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10 disabled:opacity-50"
+                >
+                  {uploadingSheets ? 'Uploading…' : 'Upload plans (PDF)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void runGuidedBoost()}
+                  disabled={!documents.length || boostRunning}
+                  className="rounded bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-40"
+                >
+                  {boostRunning ? 'AI running…' : 'Run AI takeoff now'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBoostOpen(true)}
+                  disabled={!documents.length}
+                  className="rounded border border-ost-border px-3 py-1.5 text-xs text-ost-muted hover:bg-white/10 disabled:opacity-40"
+                >
+                  AI options
+                </button>
+              </div>
+            </div>
+            {guideMessage && (
+              <p
+                className={`mt-2 ${
+                  guideMessage.tone === 'success'
+                    ? 'text-emerald-300'
+                    : guideMessage.tone === 'error'
+                      ? 'text-rose-300'
+                      : 'text-ost-muted'
+                }`}
+              >
+                {guideMessage.text}
+              </p>
+            )}
+            {boostReview && (
+              <p className="mt-1 text-ost-muted">
+                Latest AI result: <span className="text-slate-200">{boostReview.headline}</span>{' '}
+                ({boostReview.findings.length} findings,{' '}
+                {boostReview.suggestedConditions.length} suggested conditions)
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2 border-b border-ost-border bg-ost-panel/80 px-2 py-1 text-xs text-ost-muted">
-            <span>Drop PDF here to add sheets</span>
+            <span>Tip: drag &amp; drop PDFs anywhere in this workspace to append sheets.</span>
             <button
               type="button"
               disabled={currentPage <= 1}
