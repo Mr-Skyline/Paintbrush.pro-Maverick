@@ -387,15 +387,17 @@ export function WorkspaceLayout() {
     if (ok) alert('Also wrote CSV to exports/ on disk.');
   };
 
-  const replayLastSupportedActions = useCallback(async () => {
+  const replayLastSupportedActions = useCallback(async (opts?: { dryRun?: boolean }) => {
     const all = listAgentTraceEvents();
     const recent = all.slice(-200);
     let runAiFailures = 0;
+    const dryRun = opts?.dryRun === true;
     recordAgentTrace({
-      event: 'trace_replay_started',
+      event: dryRun ? 'trace_replay_dry_run_started' : 'trace_replay_started',
       category: 'action',
       result: 'neutral',
       context: {
+        dryRun,
         sourceWindowSize: 200,
         sourceEventCount: recent.length,
       },
@@ -424,17 +426,16 @@ export function WorkspaceLayout() {
       export_outputs: async () => {
         await exportPb();
       },
-    });
+    }, { dryRun });
 
     setTraceUiTick((n) => n + 1);
-    const applied = res.outcomes.filter((o) => o.outcome === 'applied').length;
-    const skipped = res.outcomes.filter((o) => o.outcome === 'skipped').length;
-    const failed = res.outcomes.filter((o) => o.outcome === 'failed').length;
+    const { applied, skipped, failed } = res.counts;
     recordAgentTrace({
-      event: 'trace_replay_completed',
+      event: dryRun ? 'trace_replay_dry_run_completed' : 'trace_replay_completed',
       category: 'outcome',
       result: failed > 0 || runAiFailures > 0 ? 'error' : 'success',
       context: {
+        dryRun,
         sourceEventCount: recent.length,
         appliedCount: applied,
         skippedCount: skipped,
@@ -442,7 +443,8 @@ export function WorkspaceLayout() {
         runAiFailures,
       },
     });
-    const msg = `Replay: ${res.outcomes.length} events, applied ${applied}, skipped ${skipped}, failed ${failed}${
+    const modePrefix = dryRun ? 'Replay dry-run' : 'Replay';
+    const msg = `${modePrefix}: ${res.outcomes.length} events, applied ${applied}, skipped ${skipped}, failed ${failed}${
       runAiFailures ? `, run AI failures ${runAiFailures}` : ''
     }.`;
     if (recent.length === 0) {
@@ -589,6 +591,7 @@ export function WorkspaceLayout() {
               refreshKey={traceUiTick}
               onAfterMutate={() => setTraceUiTick((n) => n + 1)}
               onReplay={() => void replayLastSupportedActions()}
+              onReplayDryRun={() => void replayLastSupportedActions({ dryRun: true })}
             />
           ) : null}
           <div className="min-h-0 flex-1 overflow-auto p-2">

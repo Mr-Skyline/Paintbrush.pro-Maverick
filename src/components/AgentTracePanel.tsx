@@ -65,10 +65,12 @@ export function AgentTracePanel({
   refreshKey,
   onAfterMutate,
   onReplay,
+  onReplayDryRun,
 }: {
   refreshKey: number;
   onAfterMutate?: () => void;
   onReplay?: () => void;
+  onReplayDryRun?: () => void;
 }) {
   void refreshKey;
   const all = listAgentTraceEvents();
@@ -141,6 +143,18 @@ export function AgentTracePanel({
             }}
           >
             Replay
+          </button>
+        ) : null}
+        {onReplayDryRun ? (
+          <button
+            type="button"
+            className="rounded border border-ost-border px-1.5 py-0.5 hover:bg-white/10"
+            onClick={() => {
+              onReplayDryRun();
+              bump();
+            }}
+          >
+            Replay dry-run
           </button>
         ) : null}
       </div>
