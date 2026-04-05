@@ -43,12 +43,12 @@ export function WorkspaceLayout() {
   const currentPage = useProjectStore((s) => s.currentPage);
   const conditions = useProjectStore((s) => s.conditions);
   const setBoostReview = useProjectStore((s) => s.setBoostReview);
-  const setPage = useProjectStore((s) => s.setPage);
   const totalPages = useProjectStore((s) => s.totalPages);
   const projectId = useProjectStore((s) => s.projectId);
   const documents = useProjectStore((s) => s.documents);
   const boostReview = useProjectStore((s) => s.boostReview);
   const reviewOpen = useProjectStore((s) => s.reviewOpen);
+  const projectName = useProjectStore((s) => s.projectName);
 
   useAutoSave(!!projectId);
 
@@ -109,6 +109,15 @@ export function WorkspaceLayout() {
     },
     [pdfData, currentPage, conditions, setBoostReview]
   );
+
+  const fitCanvasView = useCallback(() => {
+    const c = (window as unknown as { __takeoffCanvas?: fabric.Canvas })
+      .__takeoffCanvas;
+    c?.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    const pc = document.querySelector('.pdf-canvas') as HTMLElement | null;
+    if (pc) pc.style.transform = '';
+    c?.requestRenderAll();
+  }, []);
 
   const openPlanPicker = useCallback(() => {
     fileInputRef.current?.click();
@@ -362,7 +371,10 @@ export function WorkspaceLayout() {
       />
       <ToolbarOST
         onProjects={goProjects}
+        onOpenUpload={openPlanPicker}
         onOpenBoost={() => setBoostOpen(true)}
+        onFindSimilar={findSimilar}
+        onFitView={fitCanvasView}
         onSaveProject={saveManual}
         onSyncDisk={syncDisk}
         onExportPaintbrush={exportPb}
@@ -371,17 +383,21 @@ export function WorkspaceLayout() {
       <div className="flex min-h-0 flex-1">
         <SidebarLeft />
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b border-ost-border bg-ost-panel/80 px-2 py-2 text-xs">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-[280px]">
+          <div className="border-b border-ost-border bg-gradient-to-b from-[#111723] to-[#0f141d] px-3 py-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-[320px]">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-ost-muted">
                   Guided takeoff workflow
                 </p>
-                <ol className="mt-1 grid gap-1 sm:grid-cols-2">
+                <h2 className="mt-1 text-base font-semibold text-slate-100">
+                  {projectName || 'Untitled project'} · Sheet {totalPages ? currentPage : '—'} /{' '}
+                  {totalPages || '—'}
+                </h2>
+                <ol className="mt-2 grid gap-1.5 md:grid-cols-2">
                   {workflowSteps.map((step, idx) => (
                     <li
                       key={step.id}
-                      className={`rounded border px-2 py-1.5 ${
+                      className={`rounded-md border px-2 py-1.5 ${
                         step.state === 'complete'
                           ? 'border-emerald-700/50 bg-emerald-950/30 text-emerald-200'
                           : step.state === 'active'
@@ -402,15 +418,15 @@ export function WorkspaceLayout() {
                   type="button"
                   onClick={openPlanPicker}
                   disabled={uploadingSheets}
-                  className="rounded border border-ost-border px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10 disabled:opacity-50"
+                  className="rounded-md border border-blue-500/40 bg-blue-600/15 px-3 py-2 text-xs font-medium text-blue-100 hover:bg-blue-600/25 disabled:opacity-50"
                 >
-                  {uploadingSheets ? 'Uploading…' : 'Upload plans (PDF)'}
+                  {uploadingSheets ? 'Uploading plans…' : 'Upload plans (PDF)'}
                 </button>
                 <button
                   type="button"
                   onClick={() => void runGuidedBoost()}
                   disabled={!documents.length || boostRunning}
-                  className="rounded bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-40"
+                  className="rounded-md bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-40"
                 >
                   {boostRunning ? 'AI running…' : 'Run AI takeoff now'}
                 </button>
@@ -418,9 +434,9 @@ export function WorkspaceLayout() {
                   type="button"
                   onClick={() => setBoostOpen(true)}
                   disabled={!documents.length}
-                  className="rounded border border-ost-border px-3 py-1.5 text-xs text-ost-muted hover:bg-white/10 disabled:opacity-40"
+                  className="rounded-md border border-ost-border px-3 py-2 text-xs text-ost-muted hover:bg-white/10 disabled:opacity-40"
                 >
-                  AI options
+                  Configure AI
                 </button>
               </div>
             </div>
@@ -445,47 +461,15 @@ export function WorkspaceLayout() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2 border-b border-ost-border bg-ost-panel/80 px-2 py-1 text-xs text-ost-muted">
-            <span>Tip: drag &amp; drop PDFs anywhere in this workspace to append sheets.</span>
-            <button
-              type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setPage(currentPage - 1)}
-              className="rounded px-2 py-1 hover:bg-white/10 disabled:opacity-30"
-            >
-              ◀ Prev
-            </button>
-            <button
-              type="button"
-              disabled={!totalPages || currentPage >= totalPages}
-              onClick={() => setPage(currentPage + 1)}
-              className="rounded px-2 py-1 hover:bg-white/10 disabled:opacity-30"
-            >
-              Next ▶
-            </button>
-            <button
-              type="button"
-              onClick={findSimilar}
-              className="ml-2 rounded border border-amber-600/50 px-2 py-1 text-amber-200 hover:bg-amber-900/20"
-            >
-              Auto count / Find similar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const c = (window as unknown as { __takeoffCanvas?: fabric.Canvas })
-                  .__takeoffCanvas;
-                c?.setViewportTransform([1, 0, 0, 1, 0, 0]);
-                const pc = document.querySelector('.pdf-canvas') as HTMLElement;
-                if (pc) pc.style.transform = '';
-                c?.requestRenderAll();
-              }}
-              className="rounded px-2 py-1 hover:bg-white/10"
-            >
-              Fit view
-            </button>
+          <div className="flex items-center gap-2 border-b border-ost-border bg-ost-panel/70 px-3 py-2 text-xs text-ost-muted">
+            <span className="rounded-full border border-ost-border/70 bg-black/20 px-2 py-0.5">
+              Tip: drag &amp; drop PDFs anywhere in this workspace to append sheets
+            </span>
+            <span className="rounded-full border border-ost-border/70 bg-black/20 px-2 py-0.5">
+              Use AI box tool to scope AI takeoff region
+            </span>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto p-2">
+          <div className="min-h-0 flex-1 overflow-auto bg-[#0b1018] p-3">
             <CanvasWorkspace pdfData={pdfData} />
           </div>
           <VoiceControls />

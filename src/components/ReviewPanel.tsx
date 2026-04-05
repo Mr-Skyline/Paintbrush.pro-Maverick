@@ -1,6 +1,16 @@
 import { useProjectStore } from '@/store/projectStore';
 import { applyBoostReviewApproveAll } from '@/utils/boostReviewApply';
 
+const FINDING_LABELS: Record<string, string> = {
+  wall: 'Wall segment',
+  ceiling_act: 'ACT ceiling',
+  ceiling_gwb: 'GWB ceiling',
+  door: 'Door',
+  window: 'Window',
+  room: 'Room',
+  fixture: 'Fixture',
+};
+
 export function ReviewPanel() {
   const review = useProjectStore((s) => s.boostReview);
   const setReview = useProjectStore((s) => s.setBoostReview);
@@ -16,21 +26,32 @@ export function ReviewPanel() {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 max-h-[45vh] overflow-hidden border-t border-violet-500/40 bg-ost-panel shadow-2xl">
-      <div className="flex items-start justify-between gap-4 border-b border-ost-border p-4">
+    <div className="fixed inset-x-0 bottom-0 z-50 max-h-[48vh] overflow-hidden border-t border-violet-500/40 bg-gradient-to-b from-[#151a26] to-[#111722] shadow-2xl">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ost-border p-4">
         <div>
-          <h3 className="text-lg font-semibold text-violet-200">
-            Takeoff Boost — Review
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-300/90">
+            AI findings
+          </p>
+          <h3 className="text-lg font-semibold text-violet-100">
+            AI Takeoff Review
           </h3>
-          <p className="mt-1 text-sm text-ost-muted">{review.headline}</p>
+          <p className="mt-1 max-w-3xl text-sm text-ost-muted">{review.headline}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+            <span className="rounded-full border border-ost-border/80 bg-black/20 px-2 py-0.5 text-ost-muted">
+              {review.findings.length} findings
+            </span>
+            <span className="rounded-full border border-ost-border/80 bg-black/20 px-2 py-0.5 text-ost-muted">
+              {review.suggestedConditions.length} suggested conditions
+            </span>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={approveAll}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium hover:bg-violet-500"
+            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500"
           >
-            Approve &amp; draw all
+            Approve + draw all marks
           </button>
           <button
             type="button"
@@ -58,12 +79,19 @@ export function ReviewPanel() {
           {review.findings.slice(0, 60).map((f) => (
             <li
               key={f.id}
-              className="rounded border border-ost-border bg-black/20 p-2 text-xs"
+              className="rounded-md border border-ost-border/80 bg-black/20 p-2 text-xs"
             >
-              <span className="font-medium text-slate-200">{f.kind}</span>:{' '}
-              {f.description}
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-slate-100">
+                  {FINDING_LABELS[f.kind] ?? f.kind}
+                </span>
+                <span className="rounded-full border border-ost-border/80 px-1.5 py-0.5 text-[10px] text-ost-muted">
+                  {Math.round(f.confidence * 100)}%
+                </span>
+              </div>
+              <p className="mt-1 text-slate-300">{f.description}</p>
               <div className="mt-1 text-ost-muted">
-                → {f.conditionName} ({Math.round(f.confidence * 100)}%)
+                → Condition: {f.conditionName}
               </div>
             </li>
           ))}

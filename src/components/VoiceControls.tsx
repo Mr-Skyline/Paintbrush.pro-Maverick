@@ -114,7 +114,7 @@ export function VoiceControls() {
   };
 
   return (
-    <div className="border-t border-ost-border bg-ost-panel p-3">
+    <div className="border-t border-ost-border bg-gradient-to-b from-[#141b27] to-[#10151f] p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -150,7 +150,7 @@ export function VoiceControls() {
           Clear AI box
         </button>
       </div>
-      <div className="max-h-32 overflow-y-auto rounded border border-ost-border bg-black/30 p-2 text-xs text-slate-300">
+      <div className="max-h-32 overflow-y-auto rounded border border-ost-border/80 bg-black/30 p-2 text-xs text-slate-300">
         {log.length === 0 ? (
           <span className="text-ost-muted">Voice transcript appears here.</span>
         ) : (

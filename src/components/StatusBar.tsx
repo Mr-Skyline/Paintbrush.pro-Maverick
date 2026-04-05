@@ -5,6 +5,7 @@ export function StatusBar() {
   const currentPage = useProjectStore((s) => s.currentPage);
   const totalPages = useProjectStore((s) => s.totalPages);
   const projectName = useProjectStore((s) => s.projectName);
+  const documents = useProjectStore((s) => s.documents);
   const toolModes = useProjectStore((s) => s.toolModes);
 
   const fn = (
@@ -14,8 +15,11 @@ export function StatusBar() {
   const markCount = rows.length;
 
   return (
-    <footer className="flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-ost-border bg-ost-panel px-3 py-1.5 text-[11px] text-ost-muted">
+    <footer className="flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-ost-border bg-gradient-to-b from-[#121722] to-[#0f141d] px-3 py-2 text-[11px] text-ost-muted">
       <span className="font-medium text-slate-300">{projectName || '—'}</span>
+      <span>
+        Plans: <span className="text-slate-200">{documents.length}</span>
+      </span>
       <span>
         Scale: <span className="text-blue-300">{pixelsPerFoot} px/ft</span>
       </span>
