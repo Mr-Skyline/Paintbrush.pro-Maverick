@@ -91,6 +91,16 @@ npm run bot:telegram
 
 Browsers cannot watch arbitrary paths. Stub: `node scripts/watch-incoming.mjs "C:\path"` — extend with `chokidar` + your integration.
 
+## Agent trace → rulebook (optional)
+
+Export trace JSONL from the app, then generate a draft markdown rulebook from frequent successful event sequences:
+
+```bash
+python3 scripts/trace_rulebook_generator.py --input ./agent-trace.jsonl --output ./trace-rulebook.md
+```
+
+See `scripts/TRACE_RULEBOOK.md` for flags and output shape.
+
 ## Invoice Price Review Utility
 
 Reviews material invoices (`PDF`, `JPG`, `JPEG`, `PNG`, `WEBP`, `TIF/TIFF`) and compares invoice prices against a local product-price database.
