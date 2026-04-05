@@ -2777,6 +2777,175 @@ def cmd_takeoff_copy_attempt(
     return 0
 
 
+def cmd_no_boost_area_attempt(
+    project_id: str,
+    registry_path: pathlib.Path,
+    condition_row: str,
+    monitor_index: int,
+    match_score_threshold: float,
+    cleanup_undo_count: int,
+) -> int:
+    reg = load_registry(registry_path)
+    project = next((p for p in reg.get("projects", []) if p.get("training_project_id") == project_id), None)
+    if not project:
+        print(f"Unknown training_project_id: {project_id}")
+        return 2
+    load_or_init_item_type_store()
+    out_dir = LAB_OUT_DIR / "takeoff_copy_attempts" / f"{project_id}_no_boost_{now_tag()}"
+    result = run_takeoff_copy_attempt(
+        training_project_id=project_id,
+        condition_row=condition_row,
+        left_choice="nearest",
+        monitor_index=max(1, int(monitor_index)),
+        match_score_threshold=float(match_score_threshold),
+        cleanup_undo_count=max(1, int(cleanup_undo_count)),
+        attempt_style="polyline4",
+        out_dir=out_dir,
+        condition_verify_retries=2,
+        condition_min_qty=1.0,
+        condition_prefer_contains="ceiling,ceil,cen,gwb,gyp,gypsum",
+    )
+    # Enforce strict no-Boost gates for area-style and condition names.
+    cmd = result.get("command", []) if isinstance(result, dict) else []
+    if isinstance(cmd, list):
+        cmd.extend(
+            [
+                "--condition-selection-mode",
+                "active_qty_non_unassigned",
+                "--enforce-condition-names",
+                "ceiling,gwb",
+                "--enforce-area-style",
+                "--allow-style-fallback-on-condition-lock",
+            ]
+        )
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        result["command"] = cmd
+        result["exit_code"] = proc.returncode
+        result["stdout"] = proc.stdout.strip()
+        result["stderr"] = proc.stderr.strip()
+        result_json = pathlib.Path(str(result.get("result_json", "")))
+        if result_json.exists():
+            payload = read_json(result_json)
+            result["result"] = payload
+            result["match_assessment"] = payload.get("match_assessment", {}) if isinstance(payload, dict) else {}
+            result["ok"] = bool(proc.returncode == 0 and result_json.exists())
+    print(json.dumps(result, indent=2))
+    if not bool(result.get("ok")):
+        return 5
+    ma = result.get("match_assessment", {}) if isinstance(result, dict) else {}
+    if isinstance(ma, dict) and not bool(ma.get("is_match", False)):
+        return 6
+    return 0
+
+
+def cmd_no_boost_area_batch(
+    project_id: str,
+    registry_path: pathlib.Path,
+    attempts: int,
+    monitor_index: int,
+    match_score_threshold: float,
+    cleanup_undo_count: int,
+) -> int:
+    reg = load_registry(registry_path)
+    project = next((p for p in reg.get("projects", []) if p.get("training_project_id") == project_id), None)
+    if not project:
+        print(f"Unknown training_project_id: {project_id}")
+        return 2
+    load_or_init_item_type_store()
+    total = max(1, int(attempts))
+    rows: List[Dict[str, Any]] = []
+    failures: Dict[str, int] = {}
+    root_out = LAB_OUT_DIR / "takeoff_copy_attempts" / f"{project_id}_no_boost_batch_{now_tag()}"
+    root_out.mkdir(parents=True, exist_ok=True)
+    for idx in range(1, total + 1):
+        row_name = "first" if idx % 2 == 1 else "second"
+        out_dir = root_out / f"attempt_{idx:02d}_{row_name}"
+        result = run_takeoff_copy_attempt(
+            training_project_id=project_id,
+            condition_row=row_name,
+            left_choice="nearest",
+            monitor_index=max(1, int(monitor_index)),
+            match_score_threshold=float(match_score_threshold),
+            cleanup_undo_count=max(1, int(cleanup_undo_count)),
+            attempt_style="polyline4",
+            out_dir=out_dir,
+            condition_verify_retries=2,
+            condition_min_qty=1.0,
+            condition_prefer_contains="ceiling,ceil,cen,gwb,gyp,gypsum",
+        )
+        cmd = result.get("command", []) if isinstance(result, dict) else []
+        if isinstance(cmd, list):
+            cmd.extend(
+                [
+                    "--condition-selection-mode",
+                    "active_qty_non_unassigned",
+                    "--enforce-condition-names",
+                    "ceiling,gwb",
+                    "--enforce-area-style",
+                    "--allow-style-fallback-on-condition-lock",
+                ]
+            )
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            result["command"] = cmd
+            result["exit_code"] = proc.returncode
+            result["stdout"] = proc.stdout.strip()
+            result["stderr"] = proc.stderr.strip()
+            result_json = pathlib.Path(str(result.get("result_json", "")))
+            if result_json.exists():
+                payload = read_json(result_json)
+                result["result"] = payload
+                result["match_assessment"] = payload.get("match_assessment", {}) if isinstance(payload, dict) else {}
+            result["ok"] = bool(proc.returncode == 0 and result_json.exists())
+        rows.append(result)
+        rp = result.get("result", {}) if isinstance(result.get("result", {}), dict) else {}
+        reason = str(rp.get("reason", "") or "")
+        if reason:
+            failures[reason] = int(failures.get(reason, 0)) + 1
+    bad_work_count = 0
+    match_scores: List[float] = []
+    style_fallback_count = 0
+    for r in rows:
+        ma = r.get("match_assessment", {}) if isinstance(r.get("match_assessment", {}), dict) else {}
+        is_match = bool(ma.get("is_match", False))
+        if not is_match:
+            bad_work_count += 1
+        match_scores.append(float(ma.get("score", 0.0) or 0.0))
+        style = (
+            (r.get("result", {}) if isinstance(r.get("result", {}), dict) else {})
+            .get("style_inspection", {})
+        )
+        if isinstance(style, dict) and bool(style.get("fallback_applied", False)):
+            style_fallback_count += 1
+    avg_match = round((sum(match_scores) / max(1, len(match_scores))), 2)
+    summary = {
+        "ok": True,
+        "project_id": project_id,
+        "attempts_requested": total,
+        "attempts_ran": len(rows),
+        "results": rows,
+        "bad_work_count": bad_work_count,
+        "match_score_avg": avg_match,
+        "style_fallback_count": style_fallback_count,
+        "style_fallback_rate": round((style_fallback_count / max(1, len(rows))), 3),
+        "verification_failure_reasons": failures,
+    }
+    out_json = root_out / "no_boost_area_batch_summary.json"
+    write_json(out_json, summary)
+    print(f"No-Boost area batch summary: {out_json}")
+    print(
+        json.dumps(
+            {
+                "attempts_ran": len(rows),
+                "bad_work_count": bad_work_count,
+                "match_score_avg": avg_match,
+                "style_fallback_rate": summary["style_fallback_rate"],
+            },
+            indent=2,
+        )
+    )
+    return 0 if bad_work_count == 0 else 6
+
+
 def cmd_takeoff_copy_batch(
     project_id: str,
     registry_path: pathlib.Path,
@@ -3269,6 +3438,28 @@ def main() -> int:
     p_copy_batch.add_argument("--match-score-threshold", type=float, default=55.0)
     p_copy_batch.add_argument("--cleanup-undo-count", type=int, default=2)
     p_copy_batch.add_argument("--attempt-style", choices=["point", "polyline2", "polyline4"], default="polyline4")
+    p_no_boost_attempt = sub.add_parser(
+        "no-boost-area-attempt",
+        help="Run one strict no-Boost area attempt with condition-name/style gates",
+    )
+    p_no_boost_attempt.add_argument("--project-id", required=True)
+    p_no_boost_attempt.add_argument("--registry", default=str(REGISTRY_PATH))
+    p_no_boost_attempt.add_argument("--condition-row", choices=["first", "second"], default="first")
+    p_no_boost_attempt.add_argument("--monitor-index", type=int, default=1)
+    p_no_boost_attempt.add_argument("--match-score-threshold", type=float, default=55.0)
+    p_no_boost_attempt.add_argument("--cleanup-undo-count", type=int, default=2)
+    p_no_boost_attempt.add_argument("--attempt-style", choices=["point", "polyline2", "polyline4"], default="polyline4")
+    p_no_boost_batch = sub.add_parser(
+        "no-boost-area-batch",
+        help="Run strict no-Boost area attempts in batch mode",
+    )
+    p_no_boost_batch.add_argument("--project-id", required=True)
+    p_no_boost_batch.add_argument("--registry", default=str(REGISTRY_PATH))
+    p_no_boost_batch.add_argument("--attempts", type=int, default=4)
+    p_no_boost_batch.add_argument("--monitor-index", type=int, default=1)
+    p_no_boost_batch.add_argument("--match-score-threshold", type=float, default=55.0)
+    p_no_boost_batch.add_argument("--cleanup-undo-count", type=int, default=2)
+    p_no_boost_batch.add_argument("--attempt-style", choices=["point", "polyline2", "polyline4"], default="polyline4")
     p_boost_copy = sub.add_parser(
         "boost-then-copy-attempt",
         help="Run Boost, analyze screenshot, erase Boost work, then run copy attempt",
@@ -3384,6 +3575,26 @@ def main() -> int:
             registry_path=pathlib.Path(args.registry),
             attempts=int(args.attempts),
             left_choice=args.left_choice,
+            monitor_index=int(args.monitor_index),
+            match_score_threshold=float(args.match_score_threshold),
+            cleanup_undo_count=int(args.cleanup_undo_count),
+            attempt_style=args.attempt_style,
+        )
+    if args.cmd == "no-boost-area-attempt":
+        return cmd_no_boost_area_attempt(
+            project_id=args.project_id,
+            registry_path=pathlib.Path(args.registry),
+            condition_row=args.condition_row,
+            monitor_index=int(args.monitor_index),
+            match_score_threshold=float(args.match_score_threshold),
+            cleanup_undo_count=int(args.cleanup_undo_count),
+            attempt_style=args.attempt_style,
+        )
+    if args.cmd == "no-boost-area-batch":
+        return cmd_no_boost_area_batch(
+            project_id=args.project_id,
+            registry_path=pathlib.Path(args.registry),
+            attempts=int(args.attempts),
             monitor_index=int(args.monitor_index),
             match_score_threshold=float(args.match_score_threshold),
             cleanup_undo_count=int(args.cleanup_undo_count),

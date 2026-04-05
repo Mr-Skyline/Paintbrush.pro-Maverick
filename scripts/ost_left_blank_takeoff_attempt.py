@@ -9,6 +9,7 @@ import argparse
 import json
 import pathlib
 import subprocess
+import sys
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
@@ -158,17 +159,18 @@ def run_condition_selector(
     out_dir: pathlib.Path,
     window_title_contains: str,
     prefer_contains: str,
+    selection_mode: str = "active_qty_non_unassigned",
 ) -> Dict[str, Any]:
     out_json = out_dir / "condition_selection.json"
     cmd = [
-        "python",
+        sys.executable,
         "scripts/ost_select_condition_row.py",
         "--setup-config",
         str(setup_config),
         "--condition-row",
         str(condition_row),
         "--selection-mode",
-        "active_qty_non_unassigned",
+        str(selection_mode),
         "--monitor-index",
         str(monitor_index),
         "--window-title-contains",
@@ -194,6 +196,8 @@ def evaluate_condition_selection(
     selection_result: Dict[str, Any],
     min_qty: float,
     preferred_keywords: List[str] | None = None,
+    selection_mode: str = "active_qty_non_unassigned",
+    allowed_condition_names: List[str] | None = None,
 ) -> Dict[str, Any]:
     sel = selection_result.get("selection", {}) if isinstance(selection_result, dict) else {}
     active = sel.get("active_detection", {}) if isinstance(sel, dict) else {}
@@ -206,24 +210,36 @@ def evaluate_condition_selection(
     click_ok = isinstance(click, dict) and int(click.get("x", 0) or 0) > 0 and int(click.get("y", 0) or 0) > 0
     unassigned = "unassigned" in text.lower()
     preferred_keywords = preferred_keywords or []
+    allowed_condition_names = allowed_condition_names or []
     keyword = str(sel.get("selected_condition_keyword", "") or "").lower()
     prefer_hit = (not preferred_keywords) or bool(keyword and keyword in preferred_keywords)
+    name_lc = text.lower()
+    name_allowed = (not allowed_condition_names) or any(tok in name_lc for tok in allowed_condition_names)
     selected_row_y = int(selected.get("y_center_global", 0) or 0)
     click_y = int(click.get("y", 0) or 0) if isinstance(click, dict) else 0
     safe_applied = bool((safe_adj or {}).get("applied", False)) if isinstance(safe_adj, dict) else False
     y_aligned = selected_row_y <= 0 or click_y <= 0 or abs(selected_row_y - click_y) <= 120 or safe_applied
+    qty_ok = qty >= float(min_qty)
+    selected_mode_ok = selected_by == str(selection_mode)
+    if str(selection_mode) == "active_name_non_unassigned":
+        qty_ok = True
+        # Accept qty mode too if OCR found qty and still hit requested names.
+        selected_mode_ok = selected_by in {"active_name_non_unassigned", "active_qty_non_unassigned"}
     is_verified = (
-        selected_by == "active_qty_non_unassigned"
-        and qty >= float(min_qty)
+        selected_mode_ok
+        and qty_ok
         and (not unassigned)
         and prefer_hit
+        and name_allowed
         and click_ok
         and y_aligned
     )
     return {
         "verified": bool(is_verified),
+        "selection_mode_requested": str(selection_mode),
         "selected_by": selected_by,
         "qty": float(qty),
+        "qty_ok": bool(qty_ok),
         "text": text,
         "unassigned": bool(unassigned),
         "click_ok": bool(click_ok),
@@ -234,6 +250,67 @@ def evaluate_condition_selection(
         "selected_keyword": keyword,
         "preferred_keywords": preferred_keywords,
         "preferred_keyword_hit": bool(prefer_hit),
+        "allowed_condition_names": allowed_condition_names,
+        "name_allowed": bool(name_allowed),
+    }
+
+
+def _parse_token_list(raw: str) -> List[str]:
+    return [t.strip().lower() for t in str(raw or "").split(",") if t.strip()]
+
+
+def evaluate_style_inspection(
+    selection_result: Dict[str, Any],
+    condition_verification: Dict[str, Any],
+    enforce_area_style: bool,
+    allow_fallback_on_condition_lock: bool,
+) -> Dict[str, Any]:
+    if not bool(enforce_area_style):
+        return {
+            "enforced": False,
+            "ok": True,
+            "reason": "not_enforced",
+            "style_detected": "not_checked",
+            "fallback_applied": False,
+            "condition_lock_confident": bool(condition_verification.get("verified", False)),
+        }
+
+    sel = selection_result.get("selection", {}) if isinstance(selection_result, dict) else {}
+    text = str(sel.get("selected_condition_text", "") or "")
+    text_lc = text.lower()
+    style_detected = "area" if "area" in text_lc else "unknown"
+    style_inspection_ok = style_detected == "area"
+    condition_lock_confident = (
+        bool(condition_verification.get("verified", False))
+        and bool(condition_verification.get("click_ok", False))
+        and bool(condition_verification.get("y_aligned", False))
+    )
+    fallback_applied = False
+    if (
+        (not style_inspection_ok)
+        and bool(allow_fallback_on_condition_lock)
+        and condition_lock_confident
+        and bool(condition_verification.get("name_allowed", False))
+    ):
+        # Safe fallback: if style OCR is inconclusive but condition row lock is strong and allowed,
+        # continue instead of hard-failing.
+        style_inspection_ok = True
+        fallback_applied = True
+
+    if style_inspection_ok and fallback_applied:
+        reason = "fallback_condition_lock"
+    elif style_inspection_ok:
+        reason = "style_area_detected"
+    else:
+        reason = "style_area_not_detected"
+    return {
+        "enforced": True,
+        "ok": bool(style_inspection_ok),
+        "reason": reason,
+        "style_detected": style_detected,
+        "selected_condition_text": text,
+        "fallback_applied": bool(fallback_applied),
+        "condition_lock_confident": bool(condition_lock_confident),
     }
 
 
@@ -551,6 +628,27 @@ def main() -> int:
         default=2,
         help="Always clear existing blocks before attempt (Ctrl+A, Delete).",
     )
+    parser.add_argument(
+        "--condition-selection-mode",
+        choices=["active_qty_non_unassigned", "active_name_non_unassigned"],
+        default="active_qty_non_unassigned",
+        help="Primary condition row selection mode.",
+    )
+    parser.add_argument(
+        "--enforce-condition-names",
+        default="ceiling,gwb",
+        help="Comma-separated required condition name tokens.",
+    )
+    parser.add_argument(
+        "--enforce-area-style",
+        action="store_true",
+        help="Require style inspection to report area mode before drawing.",
+    )
+    parser.add_argument(
+        "--allow-style-fallback-on-condition-lock",
+        action="store_true",
+        help="Allow style gate fallback when condition lock is strongly verified.",
+    )
     args = parser.parse_args()
 
     out_dir = pathlib.Path(args.output_dir)
@@ -581,12 +679,19 @@ def main() -> int:
     max_condition_attempts = max(1, int(args.condition_verify_retries) + 1)
     condition_selection: Dict[str, Any] = {}
     condition_verification: Dict[str, Any] = {"verified": False}
+    style_inspection: Dict[str, Any] = {}
     preferred_keywords = [
         t.strip().lower()
         for t in str(args.condition_prefer_contains or "").split(",")
         if t.strip()
     ]
-    for _ in range(max_condition_attempts):
+    allowed_condition_names = _parse_token_list(str(args.enforce_condition_names or ""))
+    selection_modes: List[str] = [str(args.condition_selection_mode)]
+    if str(args.condition_selection_mode) == "active_qty_non_unassigned":
+        # Fallback for no-Boost runs where qty may be zero but condition name lock is still valid.
+        selection_modes.append("active_name_non_unassigned")
+    for attempt_idx in range(max_condition_attempts):
+        mode_for_attempt = selection_modes[min(attempt_idx, len(selection_modes) - 1)]
         sel = run_condition_selector(
             setup_config=str(args.setup_config),
             condition_row=str(args.condition_row),
@@ -594,13 +699,22 @@ def main() -> int:
             out_dir=out_dir,
             window_title_contains=str(args.window_title_contains),
             prefer_contains=str(args.condition_prefer_contains),
+            selection_mode=mode_for_attempt,
         )
         verdict = evaluate_condition_selection(
             sel,
             min_qty=float(args.condition_min_qty),
             preferred_keywords=preferred_keywords,
+            selection_mode=mode_for_attempt,
+            allowed_condition_names=allowed_condition_names,
         )
-        condition_selection_attempts.append({"selection": sel, "verification": verdict})
+        condition_selection_attempts.append(
+            {
+                "selection_mode": mode_for_attempt,
+                "selection": sel,
+                "verification": verdict,
+            }
+        )
         condition_selection = sel
         condition_verification = verdict
         if bool(verdict.get("verified", False)):
@@ -615,7 +729,34 @@ def main() -> int:
             "condition_selection": condition_selection,
             "condition_selection_attempts": condition_selection_attempts,
             "condition_verification": condition_verification,
+            "allowed_condition_names": allowed_condition_names,
             "reason": "condition_verification_failed",
+            "self_review": build_self_review(
+                reason="condition_verification_failed",
+                condition_verification=condition_verification,
+            ),
+        }
+        write_json(out_dir / "left_blank_takeoff_attempt.json", result)
+        print(f"left_blank_takeoff_attempt={out_dir / 'left_blank_takeoff_attempt.json'}")
+        return 4
+    style_inspection = evaluate_style_inspection(
+        selection_result=condition_selection,
+        condition_verification=condition_verification,
+        enforce_area_style=bool(args.enforce_area_style),
+        allow_fallback_on_condition_lock=bool(args.allow_style_fallback_on_condition_lock),
+    )
+    if not bool(style_inspection.get("ok", False)):
+        result = {
+            "ok": False,
+            "timestamp": now_tag(),
+            "focused_window": focused,
+            "condition_row": args.condition_row,
+            "condition_selection": condition_selection,
+            "condition_selection_attempts": condition_selection_attempts,
+            "condition_verification": condition_verification,
+            "allowed_condition_names": allowed_condition_names,
+            "style_inspection": style_inspection,
+            "reason": "style_inspection_failed",
             "self_review": build_self_review(
                 reason="condition_verification_failed",
                 condition_verification=condition_verification,
@@ -629,7 +770,7 @@ def main() -> int:
     grouping_out = out_dir / "grouping_before_left_click.json"
     proc = subprocess.run(
         [
-            "python",
+            sys.executable,
             "scripts/ost_grouping_selector.py",
             "--monitor-index",
             str(args.monitor_index),
@@ -654,7 +795,7 @@ def main() -> int:
     verify_out = out_dir / "grouping_pre_click_verify.json"
     verify_proc = subprocess.run(
         [
-            "python",
+            sys.executable,
             "scripts/ost_grouping_selector.py",
             "--monitor-index",
             str(args.monitor_index),
@@ -787,7 +928,7 @@ def main() -> int:
     post_out = out_dir / "grouping_after_attempt.json"
     post_proc = subprocess.run(
         [
-            "python",
+            sys.executable,
             "scripts/ost_grouping_selector.py",
             "--monitor-index",
             str(args.monitor_index),
@@ -838,6 +979,8 @@ def main() -> int:
         "condition_selection": condition_selection,
         "condition_selection_attempts": condition_selection_attempts,
         "condition_verification": condition_verification,
+        "allowed_condition_names": allowed_condition_names,
+        "style_inspection": style_inspection,
         "condition_preferred_keywords": preferred_keywords,
         "pre_unblock": {
             "enabled": True,

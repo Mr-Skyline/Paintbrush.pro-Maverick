@@ -137,6 +137,7 @@ def detect_active_condition_row(
     monitor_index: int,
     ocr: OcrEngine,
     preferred_keywords: List[str] | None = None,
+    require_positive_qty: bool = True,
 ) -> Dict[str, Any]:
     anchors = cfg.get("anchors", {}) if isinstance(cfg, dict) else {}
     a1 = anchors.get("conditions_first_row", {}) if isinstance(anchors, dict) else {}
@@ -217,8 +218,11 @@ def detect_active_condition_row(
         if alpha_count < 2:
             continue
         has_qty, qty, qty_txt = _best_qty_from_texts(qty_texts)
-        if not has_qty or qty <= 0.0:
+        if require_positive_qty and (not has_qty or qty <= 0.0):
             continue
+        if not has_qty:
+            qty = 0.0
+            qty_txt = ""
         y_center = int((ry0 + ry1) / 2.0)
         # Prefer rows near top when multiple conditions are active.
         matched_keyword = ""
@@ -226,13 +230,14 @@ def detect_active_condition_row(
             if kw and kw in lower:
                 matched_keyword = kw
                 break
-        score = float((1000 - ridx) + (qty * 0.01) + (2000 if matched_keyword else 0))
+        score = float((1000 - ridx) + ((qty * 0.01) if has_qty else 0.0) + (2000 if matched_keyword else 0))
         candidates.append(
             {
                 "row_index": ridx,
                 "text": name_txt,
                 "qty_text": qty_txt,
                 "qty": round(qty, 3),
+                "has_qty": bool(has_qty),
                 "matched_keyword": matched_keyword,
                 "score": round(score, 3),
                 "y_center_local": y_center,
@@ -280,7 +285,7 @@ def main() -> int:
     parser.add_argument("--condition-row", choices=["first", "second"], default="first")
     parser.add_argument(
         "--selection-mode",
-        choices=["anchor_row", "active_qty_non_unassigned"],
+        choices=["anchor_row", "active_qty_non_unassigned", "active_name_non_unassigned"],
         default="active_qty_non_unassigned",
     )
     parser.add_argument("--monitor-index", type=int, default=1)
@@ -313,14 +318,16 @@ def main() -> int:
     }
     x, y = int(pt["x"]), int(pt["y"])
     mon = monitor_rect(max(1, int(args.monitor_index)))
-    if args.selection_mode == "active_qty_non_unassigned":
+    if args.selection_mode in {"active_qty_non_unassigned", "active_name_non_unassigned"}:
         preferred = _parse_preferred_keywords(str(args.prefer_contains))
         selection["preferred_keywords"] = preferred
+        require_positive_qty = args.selection_mode == "active_qty_non_unassigned"
         detected = detect_active_condition_row(
             cfg=cfg,
             monitor_index=max(1, int(args.monitor_index)),
             ocr=ocr,
             preferred_keywords=preferred,
+            require_positive_qty=require_positive_qty,
         )
         selection["active_detection"] = detected
         if bool(detected.get("ok", False)):
@@ -330,7 +337,7 @@ def main() -> int:
                 selection["selected_condition_text"] = str(sel.get("text", ""))
                 selection["selected_condition_qty"] = float(sel.get("qty", 0.0) or 0.0)
                 selection["selected_condition_keyword"] = str(sel.get("matched_keyword", "") or "")
-                selection["selected_by"] = "active_qty_non_unassigned"
+                selection["selected_by"] = str(args.selection_mode)
         else:
             selection["selected_by"] = "fallback_anchor_row"
     else:

@@ -180,6 +180,70 @@ def cmd_takeoff_copy_batch(
     )
 
 
+def cmd_no_boost_area_attempt(
+    project_id: str,
+    registry: str,
+    condition_row: str,
+    monitor_index: int,
+    match_score_threshold: float,
+    cleanup_undo_count: int,
+    attempt_style: str,
+) -> int:
+    return run_cmd(
+        [
+            sys.executable,
+            "scripts/ost_training_lab.py",
+            "no-boost-area-attempt",
+            "--project-id",
+            project_id,
+            "--registry",
+            registry,
+            "--condition-row",
+            condition_row,
+            "--monitor-index",
+            str(monitor_index),
+            "--match-score-threshold",
+            str(match_score_threshold),
+            "--cleanup-undo-count",
+            str(cleanup_undo_count),
+            "--attempt-style",
+            attempt_style,
+        ]
+    )
+
+
+def cmd_no_boost_area_batch(
+    project_id: str,
+    registry: str,
+    attempts: int,
+    monitor_index: int,
+    match_score_threshold: float,
+    cleanup_undo_count: int,
+    attempt_style: str,
+) -> int:
+    return run_cmd(
+        [
+            sys.executable,
+            "scripts/ost_training_lab.py",
+            "no-boost-area-batch",
+            "--project-id",
+            project_id,
+            "--registry",
+            registry,
+            "--attempts",
+            str(attempts),
+            "--monitor-index",
+            str(monitor_index),
+            "--match-score-threshold",
+            str(match_score_threshold),
+            "--cleanup-undo-count",
+            str(cleanup_undo_count),
+            "--attempt-style",
+            attempt_style,
+        ]
+    )
+
+
 def cmd_boost_then_copy_attempt(
     project_id: str,
     registry: str,
@@ -715,6 +779,28 @@ def main() -> int:
     p_copy_batch.add_argument("--match-score-threshold", type=float, default=55.0)
     p_copy_batch.add_argument("--cleanup-undo-count", type=int, default=2)
     p_copy_batch.add_argument("--attempt-style", choices=["point", "polyline2", "polyline4"], default="polyline4")
+    p_no_boost_attempt = sub.add_parser(
+        "no-boost-area-attempt",
+        help="Run one strict no-Boost area attempt with condition-name/style gates",
+    )
+    p_no_boost_attempt.add_argument("--project-id", required=True)
+    p_no_boost_attempt.add_argument("--registry", default="scripts/ost_training_registry.json")
+    p_no_boost_attempt.add_argument("--condition-row", choices=["first", "second"], default="first")
+    p_no_boost_attempt.add_argument("--monitor-index", type=int, default=1)
+    p_no_boost_attempt.add_argument("--match-score-threshold", type=float, default=55.0)
+    p_no_boost_attempt.add_argument("--cleanup-undo-count", type=int, default=2)
+    p_no_boost_attempt.add_argument("--attempt-style", choices=["point", "polyline2", "polyline4"], default="polyline4")
+    p_no_boost_batch = sub.add_parser(
+        "no-boost-area-batch",
+        help="Run strict no-Boost area attempts in batch mode",
+    )
+    p_no_boost_batch.add_argument("--project-id", required=True)
+    p_no_boost_batch.add_argument("--registry", default="scripts/ost_training_registry.json")
+    p_no_boost_batch.add_argument("--attempts", type=int, default=4)
+    p_no_boost_batch.add_argument("--monitor-index", type=int, default=1)
+    p_no_boost_batch.add_argument("--match-score-threshold", type=float, default=55.0)
+    p_no_boost_batch.add_argument("--cleanup-undo-count", type=int, default=2)
+    p_no_boost_batch.add_argument("--attempt-style", choices=["point", "polyline2", "polyline4"], default="polyline4")
     p_boost_copy = sub.add_parser(
         "boost-then-copy-attempt",
         help="Run Boost, analyze, erase Boost result, then attempt copy on blank drawing",
@@ -919,6 +1005,26 @@ def main() -> int:
             registry=args.registry,
             attempts=int(args.attempts),
             left_choice=args.left_choice,
+            monitor_index=int(args.monitor_index),
+            match_score_threshold=float(args.match_score_threshold),
+            cleanup_undo_count=int(args.cleanup_undo_count),
+            attempt_style=args.attempt_style,
+        )
+    if args.cmd == "no-boost-area-attempt":
+        return cmd_no_boost_area_attempt(
+            project_id=args.project_id,
+            registry=args.registry,
+            condition_row=args.condition_row,
+            monitor_index=int(args.monitor_index),
+            match_score_threshold=float(args.match_score_threshold),
+            cleanup_undo_count=int(args.cleanup_undo_count),
+            attempt_style=args.attempt_style,
+        )
+    if args.cmd == "no-boost-area-batch":
+        return cmd_no_boost_area_batch(
+            project_id=args.project_id,
+            registry=args.registry,
+            attempts=int(args.attempts),
             monitor_index=int(args.monitor_index),
             match_score_threshold=float(args.match_score_threshold),
             cleanup_undo_count=int(args.cleanup_undo_count),
