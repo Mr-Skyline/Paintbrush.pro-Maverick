@@ -1,3 +1,4 @@
+import { AgentTracePanel } from '@/components/AgentTracePanel';
 import { CanvasWorkspace } from '@/components/CanvasWorkspace';
 import { BoostDialog } from '@/components/BoostDialog';
 import { ReviewPanel } from '@/components/ReviewPanel';
@@ -14,6 +15,7 @@ import { saveProjectToIndexedDb } from '@/lib/projectPersistence';
 import { downloadProjectZip } from '@/lib/zipExport';
 import { downloadPaintbrushCsv } from '@/lib/paintbrushExport';
 import { setAgentHostHandlers } from '@/agent/agentHost';
+import { downloadAgentTraceJsonl, recordAgentTrace } from '@/lib/agentTrace';
 import { useNavigationStore } from '@/store/navigationStore';
 import { useProjectStore } from '@/store/projectStore';
 import { getAiFocusBoundingRectPx } from '@/utils/aiFocusContext';
@@ -29,6 +31,9 @@ type BoostRunResult = { ok: boolean; error?: string; headline?: string };
 export function WorkspaceLayout() {
   const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
   const [boostOpen, setBoostOpen] = useState(false);
+  const [tracePanelOpen, setTracePanelOpen] = useState(false);
+  const [traceUiTick, setTraceUiTick] = useState(0);
+
   const openProjectId = useNavigationStore((s) => s.openProjectId);
   const goProjects = useNavigationStore((s) => s.goToProjects);
   const activeDocumentId = useProjectStore((s) => s.activeDocumentId);
@@ -41,6 +46,35 @@ export function WorkspaceLayout() {
   const documents = useProjectStore((s) => s.documents);
 
   useAutoSave(!!projectId);
+
+  useEffect(() => {
+    const st0 = useProjectStore.getState();
+    recordAgentTrace({
+      event: 'session_started',
+      category: 'session',
+      result: 'success',
+      context: {
+        projectId: st0.projectId ?? null,
+        activeDocumentId: st0.activeDocumentId ?? null,
+        currentPage: st0.currentPage,
+        totalPages: st0.totalPages ?? 0,
+      },
+    });
+    return () => {
+      const st = useProjectStore.getState();
+      recordAgentTrace({
+        event: 'session_ended',
+        category: 'session',
+        result: 'success',
+        context: {
+          projectId: st.projectId ?? null,
+          activeDocumentId: st.activeDocumentId ?? null,
+          currentPage: st.currentPage,
+          totalPages: st.totalPages ?? 0,
+        },
+      });
+    };
+  }, []);
 
   useEffect(() => {
     if (!openProjectId || !activeDocumentId) {
@@ -58,7 +92,19 @@ export function WorkspaceLayout() {
 
   const runBoost = useCallback(
     async (scope: 'page' | 'all'): Promise<BoostRunResult> => {
+      recordAgentTrace({
+        event: 'run_ai_takeoff_started',
+        category: 'ai',
+        result: 'pending',
+        context: { scope },
+      });
       if (!pdfData) {
+        recordAgentTrace({
+          event: 'run_ai_takeoff_ended',
+          category: 'ai',
+          result: 'failure',
+          context: { scope, error: 'No PDF loaded for this sheet.' },
+        });
         return { ok: false, error: 'No PDF loaded for this sheet.' };
       }
       try {
@@ -79,6 +125,12 @@ export function WorkspaceLayout() {
             aiFocus
           );
           setBoostReview(review);
+          recordAgentTrace({
+            event: 'run_ai_takeoff_ended',
+            category: 'ai',
+            result: 'success',
+            context: { scope, headline: review.headline },
+          });
           return { ok: true, headline: review.headline };
         }
         const page = await doc.getPage(1);
@@ -92,8 +144,20 @@ export function WorkspaceLayout() {
         );
         review.headline = `[All pages stub] ${review.headline}`;
         setBoostReview(review);
+        recordAgentTrace({
+          event: 'run_ai_takeoff_ended',
+          category: 'ai',
+          result: 'success',
+          context: { scope, headline: review.headline },
+        });
         return { ok: true, headline: review.headline };
       } catch (e) {
+        recordAgentTrace({
+          event: 'run_ai_takeoff_ended',
+          category: 'ai',
+          result: 'failure',
+          context: { scope, error: String(e) },
+        });
         return { ok: false, error: String(e) };
       }
     },
@@ -125,16 +189,41 @@ export function WorkspaceLayout() {
   };
 
   const findSimilar = () => {
+    recordAgentTrace({
+      event: 'workspace_find_similar_invoked',
+      category: 'tool',
+      result: 'pending',
+    });
     const c = (window as unknown as { __takeoffCanvas?: fabric.Canvas })
       .__takeoffCanvas;
-    if (!c) return;
+    if (!c) {
+      recordAgentTrace({
+        event: 'workspace_find_similar_result',
+        category: 'tool',
+        result: 'failure',
+        context: { reason: 'no_canvas' },
+      });
+      return;
+    }
     const a = c.getActiveObject();
     if (!a) {
+      recordAgentTrace({
+        event: 'workspace_find_similar_result',
+        category: 'tool',
+        result: 'skipped',
+        context: { reason: 'no_selection' },
+      });
       alert('Select a mark first.');
       return;
     }
     const sim = findSimilarMarks(c, a);
     if (!sim.length) {
+      recordAgentTrace({
+        event: 'workspace_find_similar_result',
+        category: 'tool',
+        result: 'skipped',
+        context: { reason: 'no_matches' },
+      });
       alert('No similar marks found.');
       return;
     }
@@ -150,6 +239,12 @@ export function WorkspaceLayout() {
       c.setActiveObject(grp);
       c.requestRenderAll();
     }
+    recordAgentTrace({
+      event: 'workspace_find_similar_result',
+      category: 'tool',
+      result: 'success',
+      context: { selectedCount: sel.length },
+    });
     alert(`Selected ${sel.length} similar marks.`);
   };
 
@@ -157,6 +252,12 @@ export function WorkspaceLayout() {
     e.preventDefault();
     const f = e.dataTransfer.files?.[0];
     if (!f || !/\.pdf$/i.test(f.name) || !projectId) return;
+    recordAgentTrace({
+      event: 'workspace_pdf_upload_started',
+      category: 'data',
+      result: 'pending',
+      context: { fileName: f.name },
+    });
     try {
       const buf = await f.arrayBuffer();
       const docId = crypto.randomUUID();
@@ -166,8 +267,20 @@ export function WorkspaceLayout() {
       useProjectStore.getState().setActiveDocument(docId);
       setPdfData(buf);
       await saveProjectToIndexedDb();
+      recordAgentTrace({
+        event: 'workspace_pdf_upload_completed',
+        category: 'data',
+        result: 'success',
+        context: { fileName: f.name, documentId: docId, numPages: doc.numPages },
+      });
     } catch (err) {
       console.error(err);
+      recordAgentTrace({
+        event: 'workspace_pdf_upload_failed',
+        category: 'data',
+        result: 'failure',
+        context: { fileName: f.name, error: String(err) },
+      });
       alert('Could not add PDF.');
     }
   };
@@ -175,14 +288,31 @@ export function WorkspaceLayout() {
   const saveManual = async () => {
     try {
       await saveProjectToIndexedDb();
+      recordAgentTrace({
+        event: 'workspace_save_manual',
+        category: 'data',
+        result: 'success',
+      });
       alert('Saved to browser storage.');
     } catch (e) {
+      recordAgentTrace({
+        event: 'workspace_save_manual',
+        category: 'data',
+        result: 'failure',
+        context: { error: String(e) },
+      });
       alert(String(e));
     }
   };
 
   const syncDisk = async () => {
     const ok = await syncProjectToFileSystem();
+    recordAgentTrace({
+      event: 'workspace_sync_disk',
+      category: 'export',
+      result: ok ? 'success' : 'failure',
+      context: { ok },
+    });
     alert(
       ok
         ? 'Synced to linked workspace folder.'
@@ -191,31 +321,96 @@ export function WorkspaceLayout() {
   };
 
   const exportPb = async () => {
+    recordAgentTrace({
+      event: 'workspace_export_paintbrush',
+      category: 'export',
+      result: 'pending',
+    });
     const rows = exportRows();
     downloadPaintbrushCsv(rows);
     const ok = await exportCsvToFileSystem(rows, `takeoff-${Date.now()}.csv`);
+    recordAgentTrace({
+      event: 'workspace_export_paintbrush',
+      category: 'export',
+      result: 'success',
+      context: { rowCount: rows.length, wroteToDisk: ok },
+    });
+    recordAgentTrace({
+      event: 'export_paintbrush_csv',
+      category: 'export',
+      result: 'success',
+      context: { rowCount: rows.length, wroteToDisk: ok },
+    });
     if (ok) alert('Also wrote CSV to exports/ on disk.');
   };
 
   const downloadZip = async () => {
-    if (!projectId) return;
-    const ost = buildOstProjectFile();
-    const parts: { relativePath: string; buffer: ArrayBuffer }[] = [];
-    for (const d of documents) {
-      const buf = await loadPdfBlob(projectId, d.id);
-      if (buf)
-        parts.push({
-          relativePath: `pdfs/${d.name.replace(/[^\w.-]+/g, '_')}`,
-          buffer: buf,
-        });
+    if (!projectId) {
+      recordAgentTrace({
+        event: 'workspace_download_zip',
+        category: 'export',
+        result: 'skipped',
+        context: { reason: 'no_project' },
+      });
+      return;
     }
-    await downloadProjectZip(
-      projectId,
-      ost.projectName,
-      ost,
-      parts
-    );
+    recordAgentTrace({
+      event: 'workspace_download_zip_started',
+      category: 'export',
+      result: 'pending',
+      context: { projectId },
+    });
+    try {
+      const ost = buildOstProjectFile();
+      const parts: { relativePath: string; buffer: ArrayBuffer }[] = [];
+      for (const d of documents) {
+        const buf = await loadPdfBlob(projectId, d.id);
+        if (buf)
+          parts.push({
+            relativePath: `pdfs/${d.name.replace(/[^\w.-]+/g, '_')}`,
+            buffer: buf,
+          });
+      }
+      await downloadProjectZip(projectId, ost.projectName, ost, parts);
+      recordAgentTrace({
+        event: 'workspace_download_zip',
+        category: 'export',
+        result: 'success',
+        context: { pdfParts: parts.length },
+      });
+    } catch (e) {
+      recordAgentTrace({
+        event: 'workspace_download_zip',
+        category: 'export',
+        result: 'failure',
+        context: { error: String(e) },
+      });
+      throw e;
+    }
   };
+
+  const goPage = (next: number, direction: 'prev' | 'next') => {
+    recordAgentTrace({
+      event: 'workspace_page_nav',
+      category: 'navigation',
+      result: 'success',
+      context: { direction, from: currentPage, to: next },
+    });
+    setPage(next);
+  };
+
+  useEffect(() => {
+    const onExport = () => {
+      try {
+        downloadAgentTraceJsonl();
+        alert('Agent trace exported (JSON Lines download).');
+      } catch (e) {
+        alert(`Trace export failed: ${String(e)}`);
+      }
+    };
+    window.addEventListener('agent-trace:export', onExport);
+    return () => window.removeEventListener('agent-trace:export', onExport);
+  }, []);
 
   return (
     <div
@@ -234,12 +429,12 @@ export function WorkspaceLayout() {
       <div className="flex min-h-0 flex-1">
         <SidebarLeft />
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center gap-2 border-b border-ost-border bg-ost-panel/80 px-2 py-1 text-xs text-ost-muted">
+          <div className="flex flex-wrap items-center gap-2 border-b border-ost-border bg-ost-panel/80 px-2 py-1 text-xs text-ost-muted">
             <span>Drop PDF here to add sheets</span>
             <button
               type="button"
               disabled={currentPage <= 1}
-              onClick={() => setPage(currentPage - 1)}
+              onClick={() => goPage(currentPage - 1, 'prev')}
               className="rounded px-2 py-1 hover:bg-white/10 disabled:opacity-30"
             >
               ◀ Prev
@@ -247,7 +442,7 @@ export function WorkspaceLayout() {
             <button
               type="button"
               disabled={!totalPages || currentPage >= totalPages}
-              onClick={() => setPage(currentPage + 1)}
+              onClick={() => goPage(currentPage + 1, 'next')}
               className="rounded px-2 py-1 hover:bg-white/10 disabled:opacity-30"
             >
               Next ▶
@@ -273,7 +468,20 @@ export function WorkspaceLayout() {
             >
               Fit view
             </button>
+            <button
+              type="button"
+              onClick={() => setTracePanelOpen((o) => !o)}
+              className="ml-auto rounded border border-ost-border px-2 py-1 text-ost-muted hover:bg-white/10"
+            >
+              {tracePanelOpen ? 'Hide trace' : 'Trace'}
+            </button>
           </div>
+          {tracePanelOpen ? (
+            <AgentTracePanel
+              refreshKey={traceUiTick}
+              onAfterMutate={() => setTraceUiTick((n) => n + 1)}
+            />
+          ) : null}
           <div className="min-h-0 flex-1 overflow-auto p-2">
             <CanvasWorkspace pdfData={pdfData} />
           </div>

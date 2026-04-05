@@ -1,11 +1,10 @@
 /**
- * Agent / operator trace utilities for training and replay scaffolding.
- * Persists to localStorage in the browser; no-ops safely elsewhere (SSR, Node).
+ * Agent trace: browser localStorage (`paintbrush.agent_trace.v1`), newest-first cap at 5000.
+ * Read/write no-ops when localStorage is unavailable (SSR, Node).
  */
 
 const STORAGE_KEY = 'paintbrush.agent_trace.v1';
 const MAX_EVENTS = 5000;
-const DEFAULT_TOP_EVENTS = 10;
 
 export type AgentTraceCategory =
   | 'session'
@@ -36,17 +35,78 @@ export type AgentTraceEvent = {
   context?: Record<string, unknown>;
 };
 
-/** Event names that replay tooling may subscribe to; superset of training-critical signals. */
-export const REPLAYABLE_TRACE_EVENTS: readonly string[] = [
-  'tool_selected',
-  'sheet_selected',
-  'run_ai_takeoff_started',
-  'review_approve_all',
-  'export_paintbrush_csv',
-  'download_project_zip',
-  'session_start',
-  'session_end',
-] as const satisfies readonly string[];
+/** UI axis: operational action vs branching decision vs session/meta outcome. */
+export type AgentTraceAxis = 'action' | 'decision' | 'outcome';
+
+const AXIS_ACTION: ReadonlySet<AgentTraceCategory> = new Set([
+  'tool',
+  'sheet',
+  'navigation',
+  'export',
+  'data',
+]);
+const AXIS_DECISION: ReadonlySet<AgentTraceCategory> = new Set(['ai', 'review']);
+const AXIS_OUTCOME: ReadonlySet<AgentTraceCategory> = new Set([
+  'session',
+  'system',
+  'misc',
+]);
+
+export function categoryToTraceAxis(category: AgentTraceCategory): AgentTraceAxis {
+  if (AXIS_DECISION.has(category)) return 'decision';
+  if (AXIS_OUTCOME.has(category)) return 'outcome';
+  if (AXIS_ACTION.has(category)) return 'action';
+  return 'outcome';
+}
+
+export function countAgentTraceByAxis(events: AgentTraceEvent[]): Record<AgentTraceAxis, number> {
+  const counts: Record<AgentTraceAxis, number> = {
+    action: 0,
+    decision: 0,
+    outcome: 0,
+  };
+  for (const e of events) {
+    counts[categoryToTraceAxis(e.category)] += 1;
+  }
+  return counts;
+}
+
+export function getAgentTraceViewerSnapshot(lastRecent = 20): {
+  total: number;
+  byAxis: Record<AgentTraceAxis, number>;
+  recent: AgentTraceEvent[];
+} {
+  const all = loadEventsInternal();
+  const total = all.length;
+  const byAxis = countAgentTraceByAxis(all);
+  const n = Math.max(0, Math.floor(lastRecent));
+  const recent = listRecentAgentTraceEvents(n);
+  return { total, byAxis, recent };
+}
+
+/** Handlers for deterministic replay of high-confidence trace steps. */
+export type AgentTraceReplayHandlers = {
+  onToolSelected?: (args: { tool: string }) => void | Promise<void>;
+  onSheetSelected?: (args: {
+    documentId: string;
+    page?: number;
+  }) => void | Promise<void>;
+  onRunAiTakeoffStarted?: (
+    context: Record<string, unknown> | undefined
+  ) => void | Promise<void>;
+  onReviewApproveAll?: (
+    context: Record<string, unknown> | undefined
+  ) => void | Promise<void>;
+  onExportPaintbrushCsv?: (
+    context: Record<string, unknown> | undefined
+  ) => void | Promise<void>;
+};
+
+export type ReplayAgentTraceSequenceResult = {
+  examined: number;
+  invoked: number;
+  skipped: number;
+};
 
 function isBrowserStorageAvailable(): boolean {
   return (
@@ -118,7 +178,7 @@ function persistEvents(events: AgentTraceEvent[]): void {
   try {
     globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
   } catch {
-    // Quota or privacy mode: drop persistence for this write.
+    // quota / privacy mode
   }
 }
 
@@ -127,30 +187,6 @@ function trimToCap(events: AgentTraceEvent[]): AgentTraceEvent[] {
   return events.slice(events.length - MAX_EVENTS);
 }
 
-const replayableSet = new Set<string>(REPLAYABLE_TRACE_EVENTS);
-
-const EMPTY_CATEGORY: Record<AgentTraceCategory, number> = {
-  session: 0,
-  tool: 0,
-  sheet: 0,
-  ai: 0,
-  review: 0,
-  export: 0,
-  navigation: 0,
-  system: 0,
-  data: 0,
-  misc: 0,
-};
-
-const EMPTY_RESULT: Record<AgentTraceResult, number> = {
-  success: 0,
-  failure: 0,
-  cancelled: 0,
-  skipped: 0,
-  pending: 0,
-  unknown: 0,
-};
-
 function cloneEvent(e: AgentTraceEvent): AgentTraceEvent {
   return {
     ...e,
@@ -158,12 +194,73 @@ function cloneEvent(e: AgentTraceEvent): AgentTraceEvent {
   };
 }
 
-/** All stored events, oldest first (append order). */
+function summaryWindow(
+  all: AgentTraceEvent[],
+  lastN?: number
+): AgentTraceEvent[] {
+  if (lastN === undefined) return all;
+  const n = Math.max(0, Math.floor(lastN));
+  if (n === 0) return [];
+  return all.slice(Math.max(0, all.length - n));
+}
+
+function readString(
+  ctx: Record<string, unknown> | undefined,
+  key: string
+): string | undefined {
+  const v = ctx?.[key];
+  return typeof v === 'string' && v.length > 0 ? v : undefined;
+}
+
+function readOptionalPage(
+  ctx: Record<string, unknown> | undefined
+): number | undefined {
+  const v = ctx?.page;
+  if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
+  const p = Math.floor(v);
+  return p >= 1 ? p : undefined;
+}
+
+function readScope(
+  ctx: Record<string, unknown> | undefined
+): 'page' | 'all' | undefined {
+  const v = ctx?.scope;
+  return v === 'all' || v === 'page' ? v : undefined;
+}
+
+/** Deterministic replay steps derived from trace event names. */
+export type ReplayCommand =
+  | { type: 'tool_selected'; sourceEventId: string; ts: number; tool: string }
+  | {
+      type: 'sheet_selected';
+      sourceEventId: string;
+      ts: number;
+      documentId: string;
+      page?: number;
+    }
+  | {
+      type: 'open_ai_takeoff_dialog';
+      sourceEventId: string;
+      ts: number;
+      scope?: 'page' | 'all';
+    }
+  | { type: 'review_approve_all'; sourceEventId: string; ts: number }
+  | { type: 'export_paintbrush_csv'; sourceEventId: string; ts: number }
+  | { type: 'export_project_zip'; sourceEventId: string; ts: number };
+
+const REPLAY_EVENT_NAMES = new Set<string>([
+  'tool_selected',
+  'sheet_selected',
+  'open_ai_takeoff_dialog',
+  'review_approve_all',
+  'export_paintbrush_csv',
+  'export_project_zip',
+]);
+
 export function listAgentTraceEvents(): AgentTraceEvent[] {
   return loadEventsInternal().map(cloneEvent);
 }
 
-/** Most recent events first. If `limit` is omitted, returns all events in reverse chronological order. */
 export function listRecentAgentTraceEvents(limit?: number): AgentTraceEvent[] {
   const all = loadEventsInternal();
   const reversed = [...all].reverse().map(cloneEvent);
@@ -181,7 +278,7 @@ export function clearAgentTraceEvents(): void {
   }
 }
 
-export function recordAgentTrace(
+function recordAgentTraceImpl(
   event: Omit<AgentTraceEvent, 'id' | 'ts'>
 ): AgentTraceEvent {
   const full: AgentTraceEvent = {
@@ -190,32 +287,149 @@ export function recordAgentTrace(
     ...event,
     ...(event.context !== undefined ? { context: { ...event.context } } : {}),
   };
-  if (!isBrowserStorageAvailable()) return full;
+  if (!isBrowserStorageAvailable()) return cloneEvent(full);
   const next = trimToCap([...loadEventsInternal(), full]);
   persistEvents(next);
   return cloneEvent(full);
 }
 
-export function recordAgentTraceSessionStart(
-  context?: Record<string, unknown>
-): AgentTraceEvent {
-  return recordAgentTrace({
-    event: 'session_start',
-    category: 'session',
-    result: 'success',
-    ...(context !== undefined ? { context: { ...context } } : {}),
-  });
+function legacyResultToTrace(r: string): AgentTraceResult {
+  if (r === 'ok') return 'success';
+  if (r === 'error') return 'failure';
+  return 'unknown';
 }
 
-export function recordAgentTraceSessionEnd(
-  context?: Record<string, unknown>
+export function recordAgentTrace(
+  event: Omit<AgentTraceEvent, 'id' | 'ts'>
+): AgentTraceEvent;
+export function recordAgentTrace(
+  category: string,
+  eventName: string,
+  payload: { result: string; context?: Record<string, unknown> }
+): AgentTraceEvent;
+export function recordAgentTrace(
+  eventOrCategory: Omit<AgentTraceEvent, 'id' | 'ts'> | string,
+  eventName?: string,
+  payload?: { result: string; context?: Record<string, unknown> }
 ): AgentTraceEvent {
-  return recordAgentTrace({
-    event: 'session_end',
-    category: 'session',
-    result: 'success',
-    ...(context !== undefined ? { context: { ...context } } : {}),
-  });
+  if (
+    typeof eventOrCategory === 'string' &&
+    eventName !== undefined &&
+    payload !== undefined
+  ) {
+    return recordAgentTraceImpl({
+      event: eventName,
+      category: eventOrCategory as AgentTraceCategory,
+      result: legacyResultToTrace(payload.result),
+      ...(payload.context !== undefined
+        ? { context: { ...payload.context } }
+        : {}),
+    });
+  }
+  return recordAgentTraceImpl(
+    eventOrCategory as Omit<AgentTraceEvent, 'id' | 'ts'>
+  );
+}
+
+export function getAgentTraceSummary(lastN?: number): {
+  total: number;
+  byCategory: Record<string, number>;
+  byEvent: Record<string, number>;
+  recent: AgentTraceEvent[];
+} {
+  const all = loadEventsInternal();
+  const total = all.length;
+  const window = summaryWindow(all, lastN);
+  const byCategory: Record<string, number> = {};
+  const byEvent: Record<string, number> = {};
+  for (const e of window) {
+    byCategory[e.category] = (byCategory[e.category] ?? 0) + 1;
+    byEvent[e.event] = (byEvent[e.event] ?? 0) + 1;
+  }
+  const recent = [...window].reverse().map(cloneEvent);
+  return { total, byCategory, byEvent, recent };
+}
+
+export function buildReplayCommandsFromTrace(
+  events: AgentTraceEvent[]
+): ReplayCommand[] {
+  const out: ReplayCommand[] = [];
+  for (const e of events) {
+    const ctx = e.context;
+    switch (e.event) {
+      case 'tool_selected': {
+        const tool = readString(ctx, 'tool');
+        if (tool)
+          out.push({
+            type: 'tool_selected',
+            sourceEventId: e.id,
+            ts: e.ts,
+            tool,
+          });
+        break;
+      }
+      case 'sheet_selected': {
+        const documentId = readString(ctx, 'documentId');
+        if (documentId)
+          out.push({
+            type: 'sheet_selected',
+            sourceEventId: e.id,
+            ts: e.ts,
+            documentId,
+            page: readOptionalPage(ctx),
+          });
+        break;
+      }
+      case 'open_ai_takeoff_dialog': {
+        const cmd: ReplayCommand = {
+          type: 'open_ai_takeoff_dialog',
+          sourceEventId: e.id,
+          ts: e.ts,
+        };
+        const scope = readScope(ctx);
+        if (scope !== undefined) cmd.scope = scope;
+        out.push(cmd);
+        break;
+      }
+      case 'review_approve_all':
+        out.push({
+          type: 'review_approve_all',
+          sourceEventId: e.id,
+          ts: e.ts,
+        });
+        break;
+      case 'export_paintbrush_csv':
+        out.push({
+          type: 'export_paintbrush_csv',
+          sourceEventId: e.id,
+          ts: e.ts,
+        });
+        break;
+      case 'export_project_zip':
+        out.push({
+          type: 'export_project_zip',
+          sourceEventId: e.id,
+          ts: e.ts,
+        });
+        break;
+      default:
+        break;
+    }
+  }
+  return out;
+}
+
+/** Stored events whose `event` is replayable, newest first. */
+export function getReplayableTraceEvents(limit?: number): AgentTraceEvent[] {
+  const all = loadEventsInternal();
+  const filtered: AgentTraceEvent[] = [];
+  for (let i = all.length - 1; i >= 0; i--) {
+    const e = all[i];
+    if (REPLAY_EVENT_NAMES.has(e.event)) filtered.push(cloneEvent(e));
+  }
+  if (limit === undefined) return filtered;
+  const n = Math.max(0, Math.floor(limit));
+  return filtered.slice(0, n);
 }
 
 export function downloadAgentTraceJsonl(fileName?: string): {
@@ -224,7 +438,8 @@ export function downloadAgentTraceJsonl(fileName?: string): {
 } {
   const events = loadEventsInternal();
   if (!isBrowserStorageAvailable()) return { ok: false, count: 0 };
-  if (typeof document === 'undefined') return { ok: false, count: events.length };
+  if (typeof document === 'undefined')
+    return { ok: false, count: events.length };
 
   const lines = events.map((e) => JSON.stringify(e));
   const body = lines.join('\n') + (lines.length > 0 ? '\n' : '');
@@ -243,53 +458,72 @@ export function downloadAgentTraceJsonl(fileName?: string): {
   return { ok: true, count: events.length };
 }
 
-export function getAgentTraceSummary(lastN?: number): {
-  total: number;
-  windowCount: number;
-  byCategory: Record<AgentTraceCategory, number>;
-  byResult: Record<AgentTraceResult, number>;
-  topEvents: Array<{ event: string; count: number }>;
-} {
-  const all = loadEventsInternal();
-  const total = all.length;
-  let window: AgentTraceEvent[];
-  if (lastN === undefined) {
-    window = all;
-  } else {
-    const n = Math.max(0, Math.floor(lastN));
-    window = n === 0 ? [] : all.slice(Math.max(0, all.length - n));
+/**
+ * Replay a sequence of stored events in order. Unknown event names are skipped.
+ * Only invokes a handler when the event shape is sufficient for that step.
+ */
+export async function replayAgentTraceSequence(
+  events: AgentTraceEvent[],
+  handlers: AgentTraceReplayHandlers
+): Promise<ReplayAgentTraceSequenceResult> {
+  let examined = 0;
+  let invoked = 0;
+  let skipped = 0;
+
+  for (const e of events) {
+    examined += 1;
+    const ctx = e.context;
+    let did = false;
+
+    switch (e.event) {
+      case 'tool_selected': {
+        const tool = readString(ctx, 'tool');
+        if (tool && handlers.onToolSelected) {
+          await handlers.onToolSelected({ tool });
+          did = true;
+        }
+        break;
+      }
+      case 'sheet_selected': {
+        const documentId = readString(ctx, 'documentId');
+        if (documentId && handlers.onSheetSelected) {
+          const page = readOptionalPage(ctx);
+          await handlers.onSheetSelected(
+            page !== undefined ? { documentId, page } : { documentId }
+          );
+          did = true;
+        }
+        break;
+      }
+      case 'run_ai_takeoff_started': {
+        if (handlers.onRunAiTakeoffStarted) {
+          await handlers.onRunAiTakeoffStarted(ctx);
+          did = true;
+        }
+        break;
+      }
+      case 'review_approve_all': {
+        if (handlers.onReviewApproveAll) {
+          await handlers.onReviewApproveAll(ctx);
+          did = true;
+        }
+        break;
+      }
+      case 'export_paintbrush_csv': {
+        if (handlers.onExportPaintbrushCsv) {
+          await handlers.onExportPaintbrushCsv(ctx);
+          did = true;
+        }
+        break;
+      }
+      default:
+        skipped += 1;
+        continue;
+    }
+
+    if (did) invoked += 1;
+    else skipped += 1;
   }
-  const windowCount = window.length;
 
-  const byCategory: Record<AgentTraceCategory, number> = { ...EMPTY_CATEGORY };
-  const byResult: Record<AgentTraceResult, number> = { ...EMPTY_RESULT };
-  const eventCounts = new Map<string, number>();
-
-  for (const e of window) {
-    const cat = e.category in byCategory ? e.category : ('misc' as AgentTraceCategory);
-    byCategory[cat] = (byCategory[cat] ?? 0) + 1;
-    const res = e.result in byResult ? e.result : ('unknown' as AgentTraceResult);
-    byResult[res] = (byResult[res] ?? 0) + 1;
-    eventCounts.set(e.event, (eventCounts.get(e.event) ?? 0) + 1);
-  }
-
-  const topEvents = [...eventCounts.entries()]
-    .map(([event, count]) => ({ event, count }))
-    .sort((a, b) => b.count - a.count || a.event.localeCompare(b.event))
-    .slice(0, DEFAULT_TOP_EVENTS);
-
-  return { total, windowCount, byCategory, byResult, topEvents };
-}
-
-/** Replayable events only, most recent first. */
-export function getReplayableTraceEvents(limit?: number): AgentTraceEvent[] {
-  const all = loadEventsInternal();
-  const filtered: AgentTraceEvent[] = [];
-  for (let i = all.length - 1; i >= 0; i--) {
-    const e = all[i];
-    if (replayableSet.has(e.event)) filtered.push(cloneEvent(e));
-  }
-  if (limit === undefined) return filtered;
-  const n = Math.max(0, Math.floor(limit));
-  return filtered.slice(0, n);
+  return { examined, invoked, skipped };
 }
