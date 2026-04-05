@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
+from .eval import evaluate_runs_root
 from .fresh_start import initialize_fresh_dataset
+from .dataset_ops import generate_yolo_data_yaml
 from .roboflow_client import upload_images
 
 
@@ -68,6 +71,47 @@ def parse_args() -> argparse.Namespace:
         help="List what would upload without making API calls.",
     )
 
+    yolo_cmd = sub.add_parser(
+        "write-yolo-config",
+        help="Generate YOLO data.yaml from a fresh dataset root.",
+    )
+    yolo_cmd.add_argument(
+        "--dataset-root",
+        default="takeoff_agent/train/datasets/fresh_start",
+        help="Dataset root containing images/ and labels/.",
+    )
+    yolo_cmd.add_argument(
+        "--out",
+        default="takeoff_agent/train/datasets/fresh_start/data.yaml",
+        help="Output YOLO data.yaml path.",
+    )
+    yolo_cmd.add_argument(
+        "--class-names",
+        default="exterior_wall,interior_wall,door,window,fixture",
+        help="Comma-separated class names in index order.",
+    )
+
+    eval_cmd = sub.add_parser(
+        "evaluate-runs",
+        help="Build a local quality report from takeoff output runs.",
+    )
+    eval_cmd.add_argument(
+        "--runs-root",
+        default="output",
+        help="Root folder containing run output subfolders.",
+    )
+    eval_cmd.add_argument(
+        "--out-dir",
+        default="takeoff_agent/train/eval/latest",
+        help="Folder to write eval report artifacts.",
+    )
+    eval_cmd.add_argument(
+        "--min-confidence",
+        type=float,
+        default=0.9,
+        help="Confidence threshold used for bad-run classification in the report.",
+    )
+
     return parser.parse_args()
 
 
@@ -97,6 +141,30 @@ def main() -> int:
         print(f"Uploaded: {result.uploaded}")
         print(f"Failed: {result.failed}")
         print(f"Manifest: {result.manifest_path}")
+        return 0
+
+    if args.command == "write-yolo-config":
+        class_names = [c.strip() for c in args.class_names.split(",") if c.strip()]
+        if not class_names:
+            raise ValueError("At least one class name is required.")
+        summary = generate_yolo_data_yaml(
+            dataset_root=Path(args.dataset_root).resolve(),
+            output_path=Path(args.out).resolve(),
+            class_names=class_names,
+        )
+        print(f"Wrote YOLO config: {summary.data_yaml_path}")
+        print(
+            f"Image counts train/val/test: {summary.train_count}/{summary.val_count}/{summary.test_count}"
+        )
+        return 0
+
+    if args.command == "evaluate-runs":
+        summary = evaluate_runs_root(
+            runs_root=Path(args.runs_root).resolve(),
+            out_dir=Path(args.out_dir).resolve(),
+            min_confidence=float(args.min_confidence),
+        )
+        print(json.dumps(summary, indent=2))
         return 0
 
     raise ValueError(f"Unsupported command: {args.command}")

@@ -1,0 +1,9 @@
+run_dir,project_id,pages_processed,mean_page_confidence,min_page_confidence,needs_review,has_page_error,walls_lf,rooms_sf,doors_ea
+/workspace/output/takeoff-agent,kirksey-demo,1,0.7797,0.7797,True,False,1011.99,402.89,19
+/workspace/output/takeoff-agent-supabase-service-role,kirksey-service-role,1,0.7796,0.7796,True,False,408.53,510.61,20
+/workspace/output/takeoff-agent-supabase-test,kirksey-supabase-test,1,0.7796,0.7796,True,False,408.53,510.61,20
+/workspace/output/takeoff-agent-supabase-test2,kirksey-supabase-test2,1,0.7796,0.7796,True,False,408.53,510.61,20
+/workspace/output/takeoff-agent-supabase-test3,kirksey-supabase-test3,1,0.7796,0.7796,True,False,408.53,510.61,20
+/workspace/output/takeoff-agent-supabase-test4,kirksey-supabase-test4,1,0.7796,0.7796,True,False,408.53,510.61,20
+/workspace/output/takeoff-agent-v2,kirksey-v2,1,0.7796,0.7796,True,False,408.53,510.61,20
+/workspace/output/takeoff-agent-wave1,kirksey-wave1,1,0.7796,0.7796,True,False,408.53,510.61,20

@@ -1,0 +1,107 @@
+{
+  "generated_at_utc": "2026-04-05T01:20:00.446907+00:00",
+  "runs_root": "/workspace/output",
+  "confidence_threshold": 0.9,
+  "scanned_runs": 8,
+  "low_conf_runs": 8,
+  "errored_runs": 0,
+  "avg_confidence": 0.7796,
+  "rows": [
+    {
+      "run_dir": "/workspace/output/takeoff-agent",
+      "project_id": "kirksey-demo",
+      "pages_processed": 1,
+      "mean_page_confidence": 0.7797,
+      "min_page_confidence": 0.7797,
+      "needs_review": true,
+      "has_page_error": false,
+      "walls_lf": 1011.99,
+      "rooms_sf": 402.89,
+      "doors_ea": 19
+    },
+    {
+      "run_dir": "/workspace/output/takeoff-agent-supabase-service-role",
+      "project_id": "kirksey-service-role",
+      "pages_processed": 1,
+      "mean_page_confidence": 0.7796,
+      "min_page_confidence": 0.7796,
+      "needs_review": true,
+      "has_page_error": false,
+      "walls_lf": 408.53,
+      "rooms_sf": 510.61,
+      "doors_ea": 20
+    },
+    {
+      "run_dir": "/workspace/output/takeoff-agent-supabase-test",
+      "project_id": "kirksey-supabase-test",
+      "pages_processed": 1,
+      "mean_page_confidence": 0.7796,
+      "min_page_confidence": 0.7796,
+      "needs_review": true,
+      "has_page_error": false,
+      "walls_lf": 408.53,
+      "rooms_sf": 510.61,
+      "doors_ea": 20
+    },
+    {
+      "run_dir": "/workspace/output/takeoff-agent-supabase-test2",
+      "project_id": "kirksey-supabase-test2",
+      "pages_processed": 1,
+      "mean_page_confidence": 0.7796,
+      "min_page_confidence": 0.7796,
+      "needs_review": true,
+      "has_page_error": false,
+      "walls_lf": 408.53,
+      "rooms_sf": 510.61,
+      "doors_ea": 20
+    },
+    {
+      "run_dir": "/workspace/output/takeoff-agent-supabase-test3",
+      "project_id": "kirksey-supabase-test3",
+      "pages_processed": 1,
+      "mean_page_confidence": 0.7796,
+      "min_page_confidence": 0.7796,
+      "needs_review": true,
+      "has_page_error": false,
+      "walls_lf": 408.53,
+      "rooms_sf": 510.61,
+      "doors_ea": 20
+    },
+    {
+      "run_dir": "/workspace/output/takeoff-agent-supabase-test4",
+      "project_id": "kirksey-supabase-test4",
+      "pages_processed": 1,
+      "mean_page_confidence": 0.7796,
+      "min_page_confidence": 0.7796,
+      "needs_review": true,
+      "has_page_error": false,
+      "walls_lf": 408.53,
+      "rooms_sf": 510.61,
+      "doors_ea": 20
+    },
+    {
+      "run_dir": "/workspace/output/takeoff-agent-v2",
+      "project_id": "kirksey-v2",
+      "pages_processed": 1,
+      "mean_page_confidence": 0.7796,
+      "min_page_confidence": 0.7796,
+      "needs_review": true,
+      "has_page_error": false,
+      "walls_lf": 408.53,
+      "rooms_sf": 510.61,
+      "doors_ea": 20
+    },
+    {
+      "run_dir": "/workspace/output/takeoff-agent-wave1",
+      "project_id": "kirksey-wave1",
+      "pages_processed": 1,
+      "mean_page_confidence": 0.7796,
+      "min_page_confidence": 0.7796,
+      "needs_review": true,
+      "has_page_error": false,
+      "walls_lf": 408.53,
+      "rooms_sf": 510.61,
+      "doors_ea": 20
+    }
+  ]
+}

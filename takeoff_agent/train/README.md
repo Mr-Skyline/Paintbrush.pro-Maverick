@@ -45,7 +45,60 @@ python -m takeoff_agent.train.cli upload-images \
 - Roboflow project slug (or set `ROBOFLOW_PROJECT`)
 - Optional workspace slug (or set `ROBOFLOW_WORKSPACE`)
 
+## Generate YOLO data.yaml
+
+```bash
+python -m takeoff_agent.train.cli write-yolo-config \
+  --dataset-root /workspace/takeoff_agent/train/datasets/fresh_start \
+  --out /workspace/takeoff_agent/train/datasets/fresh_start/data.yaml
+```
+
+## Evaluate local run quality
+
+Creates a local report from existing `output/*/takeoff-results.json` runs:
+
+```bash
+python -m takeoff_agent.train.cli evaluate-runs \
+  --runs-root /workspace/output \
+  --out-dir /workspace/takeoff_agent/train/eval/latest \
+  --min-confidence 0.9
+```
+
+Outputs:
+
+- `report.json`
+- `summary.csv`
+
 ### Notes
 
 - Upload is best-effort; local dataset initialization always works.
 - This flow intentionally starts from scratch and avoids existing run artifacts.
+
+## Prepare YOLO training metadata
+
+After you add images + labels, generate a YOLO dataset yaml:
+
+```bash
+python -m takeoff_agent.train.cli generate-yolo-yaml \
+  --dataset-root /workspace/takeoff_agent/train/datasets/fresh_start
+```
+
+This writes:
+
+- `yolo_data.yaml` (train/val/test image paths + class names)
+
+## Evaluate takeoff outputs (local harness)
+
+Generate a quality report from one or more existing run outputs:
+
+```bash
+python -m takeoff_agent.train.cli eval-runs \
+  --runs-root /workspace/output \
+  --out-dir /workspace/takeoff_agent/train/eval/latest \
+  --confidence-threshold 0.90
+```
+
+This writes:
+
+- `report.json`
+- `summary.csv`
