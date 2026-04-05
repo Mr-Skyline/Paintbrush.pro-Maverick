@@ -10,10 +10,24 @@ detection:
     min_length_px: 30
     max_line_gap: 8
     hough_threshold: 80
+    yolo:
+      enabled: false
+      model_path: ""
+      confidence_threshold: 0.25
   rooms:
     min_area_px: 2000
   counts:
     min_area_px: 20
 
+retry:
+  enable: true
+  min_confidence: 0.8
+  downscale_factor: 2.0
+
 postprocess:
   min_confidence: 0.9
+
+runtime:
+  logger_name: takeoff_agent
+  log_file: run.log
+  errors_file: errors.jsonl

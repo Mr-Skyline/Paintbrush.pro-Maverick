@@ -1,6 +1,41 @@
 from __future__ import annotations
 
+import math
 from typing import Any
+
+
+def _normalize_angle_deg(p1: list[int], p2: list[int]) -> float:
+    dx = float(p2[0] - p1[0])
+    dy = float(p2[1] - p1[1])
+    if abs(dx) < 1e-9 and abs(dy) < 1e-9:
+        return 0.0
+    angle = abs(math.degrees(math.atan2(dy, dx)))
+    if angle > 180:
+        angle %= 180
+    if angle > 90:
+        angle = 180 - angle
+    return angle
+
+
+def _snap_wall_axis(
+    start: list[int], end: list[int], angle_threshold_deg: float = 10.0
+) -> tuple[list[int], list[int]]:
+    angle = _normalize_angle_deg(start, end)
+    sx, sy = start
+    ex, ey = end
+    if angle <= angle_threshold_deg:
+        ey = sy
+    elif abs(angle - 90.0) <= angle_threshold_deg:
+        ex = sx
+    return [sx, sy], [ex, ey]
+
+
+def _wall_signature(
+    start: list[int], end: list[int], quant: int = 4
+) -> tuple[int, int, int, int]:
+    s = [int(round(start[0] / quant) * quant), int(round(start[1] / quant) * quant)]
+    e = [int(round(end[0] / quant) * quant), int(round(end[1] / quant) * quant)]
+    return tuple(s + e) if s <= e else tuple(e + s)
 
 
 def _poly_area_px(points: list[list[int]]) -> float:
@@ -42,9 +77,13 @@ def finalize_page_results(
 
     walls: list[dict[str, Any]] = []
     total_walls_lf = 0.0
+    seen_wall_keys: set[tuple[int, int, int, int]] = set()
     for wall in raw_detection.walls:
-        start = wall["start_px"]
-        end = wall["end_px"]
+        start, end = _snap_wall_axis(wall["start_px"], wall["end_px"])
+        wall_key = _wall_signature(start, end, quant=4)
+        if wall_key in seen_wall_keys:
+            continue
+        seen_wall_keys.add(wall_key)
         length_ft = float(wall["length_px"]) / px_per_foot
         total_walls_lf += length_ft
         walls.append(

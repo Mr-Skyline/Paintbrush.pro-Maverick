@@ -7,3 +7,5 @@ shapely
 numpy
 pyyaml
 pillow
+supabase
+supabase

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +19,7 @@ except Exception as exc:  # pragma: no cover - import guard
 
 
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}
+_OCR_INSTANCE: Any | None = None
 
 
 @dataclass(slots=True)
@@ -46,18 +48,27 @@ def _estimate_scale_from_text(image_bgr: np.ndarray, default_ft_per_px: float) -
       - 1/8" = 1'
       - SCALE: 1/4"=1'-0"
     """
-    try:
-        from paddleocr import PaddleOCR  # type: ignore
-    except Exception:
-        return default_ft_per_px
+    global _OCR_INSTANCE
+    if _OCR_INSTANCE is None:
+        try:
+            # Prevent expensive model-host connectivity checks from blocking local runs.
+            os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+            from paddleocr import PaddleOCR  # type: ignore
+        except Exception:
+            return default_ft_per_px
 
-    # PaddleOCR constructor args vary across versions; keep this path best-effort only.
+        # PaddleOCR constructor args vary across versions; keep this path best-effort only.
+        try:
+            _OCR_INSTANCE = PaddleOCR(use_angle_cls=True, lang="en")
+        except Exception:
+            return default_ft_per_px
+
+    ocr = _OCR_INSTANCE
+    rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     try:
-        ocr = PaddleOCR(use_angle_cls=True, lang="en")
+        lines = ocr.ocr(rgb, cls=True) or []
     except Exception:
         return default_ft_per_px
-    rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-    lines = ocr.ocr(rgb, cls=True) or []
 
     text = " ".join(
         item[1][0]
@@ -106,16 +117,27 @@ def _image_from_path(path: Path) -> np.ndarray:
     return image
 
 
-def denoise_and_threshold(image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def denoise_and_threshold(
+    image_bgr: np.ndarray, preprocess_config: dict[str, Any] | None = None
+) -> tuple[np.ndarray, np.ndarray]:
+    cfg = preprocess_config or {}
+    kernel = int(cfg.get("gaussian_kernel", 5))
+    if kernel % 2 == 0:
+        kernel += 1
+    block_size = int(cfg.get("adaptive_block_size", 41))
+    if block_size % 2 == 0:
+        block_size += 1
+    c_value = int(cfg.get("adaptive_c", 5))
+
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    blurred = cv2.GaussianBlur(gray, (kernel, kernel), 0)
     thresh = cv2.adaptiveThreshold(
         blurred,
         255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY_INV,
-        41,
-        5,
+        block_size,
+        c_value,
     )
     return blurred, thresh
 

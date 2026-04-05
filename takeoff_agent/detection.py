@@ -15,10 +15,22 @@ class DetectionOutput:
     rooms: list[dict[str, Any]]
     counts: dict[str, int]
     confidence: float
+    detection_source: str
+    retries_used: int
 
 
 def _line_length(p1: tuple[int, int], p2: tuple[int, int]) -> float:
     return float(np.hypot(p2[0] - p1[0], p2[1] - p1[1]))
+
+
+def _line_angle_bucket(
+    p1: tuple[int, int], p2: tuple[int, int], bucket_degrees: float = 5.0
+) -> int:
+    dx = float(p2[0] - p1[0])
+    dy = float(p2[1] - p1[1])
+    angle = np.degrees(np.arctan2(dy, dx)) % 180.0
+    bucket = max(1.0, float(bucket_degrees))
+    return int(round(angle / bucket) * bucket)
 
 
 def _classify_wall_by_color(
@@ -44,12 +56,105 @@ def _classify_wall_by_color(
     return "wall"
 
 
+def _dedupe_walls(
+    walls: list[dict[str, Any]],
+    endpoint_tolerance_px: int = 6,
+    angle_bucket_degrees: float = 5.0,
+) -> list[dict[str, Any]]:
+    """
+    Merge likely duplicate line detections from Hough output.
+    """
+    if not walls:
+        return walls
+
+    grouped: dict[tuple[int, int, int, int], dict[str, Any]] = {}
+    for wall in walls:
+        sx, sy = wall["start_px"]
+        ex, ey = wall["end_px"]
+        p1 = (int(sx), int(sy))
+        p2 = (int(ex), int(ey))
+        if p2 < p1:
+            p1, p2 = p2, p1
+        bucket = (
+            int(round(p1[0] / endpoint_tolerance_px)),
+            int(round(p1[1] / endpoint_tolerance_px)),
+            int(round(p2[0] / endpoint_tolerance_px)),
+            int(round(p2[1] / endpoint_tolerance_px)),
+        )
+        angle_bucket = _line_angle_bucket(p1, p2, angle_bucket_degrees)
+        key = bucket + (angle_bucket,)
+
+        best = grouped.get(key)
+        if best is None or float(wall["length_px"]) > float(best["length_px"]):
+            grouped[key] = wall
+    return list(grouped.values())
+
+
+def _detect_walls_with_yolo(
+    source_image: np.ndarray,
+    model_path: str,
+    confidence_threshold: float,
+    source_fallback_classification: bool = True,
+) -> list[dict[str, Any]]:
+    """
+    Optional YOLO-based wall detection.
+
+    Expected model output:
+      boxes where each box centerline is treated as a wall segment.
+    """
+    try:
+        from ultralytics import YOLO  # type: ignore
+    except Exception:
+        return []
+
+    try:
+        model = YOLO(model_path)
+        result = model.predict(source=source_image, conf=confidence_threshold, verbose=False)[
+            0
+        ]
+    except Exception:
+        return []
+
+    boxes = getattr(result, "boxes", None)
+    if boxes is None or boxes.xyxy is None:
+        return []
+
+    walls: list[dict[str, Any]] = []
+    xyxy = boxes.xyxy.cpu().numpy().tolist()
+    confs = boxes.conf.cpu().numpy().tolist() if boxes.conf is not None else []
+    for idx, box in enumerate(xyxy):
+        x1, y1, x2, y2 = [int(v) for v in box]
+        p1 = (x1, int((y1 + y2) / 2))
+        p2 = (x2, int((y1 + y2) / 2))
+        length = _line_length(p1, p2)
+        if length <= 0:
+            continue
+        conf = float(confs[idx]) if idx < len(confs) else 0.7
+        classification = (
+            _classify_wall_by_color(source_image, p1, p2)
+            if source_fallback_classification
+            else "wall"
+        )
+        walls.append(
+            {
+                "start_px": [p1[0], p1[1]],
+                "end_px": [p2[0], p2[1]],
+                "length_px": float(length),
+                "classification": classification,
+                "confidence": conf,
+            }
+        )
+    return _dedupe_walls(walls)
+
+
 def detect_walls(
     binary_image: np.ndarray,
     min_length_px: int = 40,
     max_line_gap: int = 8,
     hough_threshold: int = 110,
     source_image: np.ndarray | None = None,
+    dedupe_distance_px: int = 6,
+    dedupe_angle_deg: float = 5.0,
 ) -> list[dict[str, Any]]:
     """
     Baseline wall detector using probabilistic Hough transform.
@@ -83,7 +188,11 @@ def detect_walls(
                 "confidence": 0.78,
             }
         )
-    return walls
+    return _dedupe_walls(
+        walls,
+        endpoint_tolerance_px=max(1, int(dedupe_distance_px)),
+        angle_bucket_degrees=max(1.0, float(dedupe_angle_deg)),
+    )
 
 
 def detect_rooms(binary_image: np.ndarray, min_area_px: float = 2000) -> list[dict[str, Any]]:
@@ -148,18 +257,39 @@ def run_detection(
     binary_image: np.ndarray,
     config: dict[str, Any],
     source_image: np.ndarray | None = None,
+    retry_index: int = 0,
 ) -> DetectionOutput:
     walls_cfg = config.get("walls", {})
     rooms_cfg = config.get("rooms", {})
     counts_cfg = config.get("counts", {})
 
-    walls = detect_walls(
-        binary_image,
-        min_length_px=int(walls_cfg.get("min_length_px", 40)),
-        max_line_gap=int(walls_cfg.get("max_line_gap", 8)),
-        hough_threshold=int(walls_cfg.get("hough_threshold", 110)),
-        source_image=source_image,
-    )
+    yolo_cfg = config.get("yolo", walls_cfg.get("yolo", {}))
+    yolo_model_path = str(yolo_cfg.get("wall_model_path", "")).strip()
+    yolo_conf = float(yolo_cfg.get("confidence", 0.25))
+    prefer_yolo = bool(yolo_cfg.get("enabled", False))
+
+    walls: list[dict[str, Any]] = []
+    detection_source = "hough"
+    if prefer_yolo and source_image is not None and yolo_model_path:
+        walls = _detect_walls_with_yolo(
+            source_image=source_image,
+            model_path=yolo_model_path,
+            confidence_threshold=yolo_conf,
+        )
+        if walls:
+            detection_source = "yolo"
+
+    if not walls:
+        walls = detect_walls(
+            binary_image,
+            min_length_px=int(walls_cfg.get("min_length_px", 40)),
+            max_line_gap=int(walls_cfg.get("max_line_gap", 8)),
+            hough_threshold=int(walls_cfg.get("hough_threshold", 110)),
+            source_image=source_image,
+            dedupe_distance_px=int(walls_cfg.get("dedupe_distance_px", 6)),
+            dedupe_angle_deg=float(walls_cfg.get("dedupe_angle_deg", 5.0)),
+        )
+        detection_source = "hough"
     rooms = detect_rooms(binary_image, float(rooms_cfg.get("min_area_px", 2000)))
     counts = detect_symbol_counts(binary_image, int(counts_cfg.get("min_area_px", 20)))
 
@@ -167,5 +297,12 @@ def run_detection(
         r.get("confidence", 0.0) for r in rooms
     ]
     pipeline_conf = float(np.mean(confidences)) if confidences else 0.0
-    return DetectionOutput(walls=walls, rooms=rooms, counts=counts, confidence=pipeline_conf)
+    return DetectionOutput(
+        walls=walls,
+        rooms=rooms,
+        counts=counts,
+        confidence=pipeline_conf,
+        detection_source=detection_source,
+        retries_used=retry_index,
+    )
 
