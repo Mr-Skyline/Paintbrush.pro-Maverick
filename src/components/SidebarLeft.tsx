@@ -27,6 +27,9 @@ export function SidebarLeft() {
   const documents = useProjectStore((s) => s.documents);
   const activeDocumentId = useProjectStore((s) => s.activeDocumentId);
   const setActiveDocument = useProjectStore((s) => s.setActiveDocument);
+  const openUploadPicker = () => {
+    window.dispatchEvent(new Event('takeoff:open-upload-picker'));
+  };
   const [phaseOpen, setPhaseOpen] = useState(true);
   const [docsOpen, setDocsOpen] = useState(true);
   const [editingConditionId, setEditingConditionId] = useState<string | null>(
@@ -52,11 +55,14 @@ export function SidebarLeft() {
   }
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-ost-border bg-ost-panel">
-      <div className="flex items-center justify-between border-b border-ost-border px-2 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-ost-muted">
-          Project
-        </span>
+    <aside className="flex w-80 shrink-0 flex-col border-r border-ost-border bg-gradient-to-b from-[#131925] to-[#10141d]">
+      <div className="flex items-center justify-between border-b border-ost-border px-3 py-3">
+        <div>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-ost-muted">
+            Workspace
+          </span>
+          <p className="mt-0.5 text-sm font-medium text-slate-100">Plans & Conditions</p>
+        </div>
         <button
           type="button"
           onClick={toggleLeft}
@@ -66,54 +72,67 @@ export function SidebarLeft() {
         </button>
       </div>
 
-      <div className="border-b border-ost-border p-2">
+      <div className="border-b border-ost-border p-3">
         <button
           type="button"
           onClick={() => setDocsOpen(!docsOpen)}
-          className="flex w-full items-center justify-between text-left text-sm font-medium"
+          className="flex w-full items-center justify-between text-left text-sm font-medium text-slate-100"
         >
           Plan set (PDFs)
           <span className="text-ost-muted">{docsOpen ? '−' : '+'}</span>
         </button>
         {docsOpen && (
-          <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto text-xs">
-            {documents.length === 0 ? (
-              <li className="text-ost-muted">No sheets — drop on canvas.</li>
-            ) : (
-              documents.map((d) => (
-                <li key={d.id}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveDocument(d.id)}
-                    className={`w-full truncate rounded px-2 py-1 text-left hover:bg-white/10 ${
-                      d.id === activeDocumentId
-                        ? 'bg-emerald-900/40 text-emerald-200'
-                        : 'text-slate-300'
-                    }`}
-                  >
-                    {d.name}{' '}
-                    <span className="text-ost-muted">({d.pageCount} pg)</span>
-                  </button>
+          <>
+            <button
+              type="button"
+              onClick={openUploadPicker}
+              className="mt-2 w-full rounded border border-blue-500/40 bg-blue-600/15 px-2 py-1 text-[11px] font-medium text-blue-100 hover:bg-blue-600/25"
+            >
+              + Upload plan PDFs
+            </button>
+            <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto text-xs">
+              {documents.length === 0 ? (
+                <li className="rounded border border-ost-border/70 bg-black/20 px-2 py-2 text-ost-muted">
+                  No sheets yet. Upload PDFs to begin takeoff.
                 </li>
-              ))
-            )}
-          </ul>
+              ) : (
+                documents.map((d) => (
+                  <li key={d.id}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDocument(d.id)}
+                      className={`w-full truncate rounded border px-2 py-1 text-left hover:bg-white/10 ${
+                        d.id === activeDocumentId
+                          ? 'border-emerald-600/60 bg-emerald-900/30 text-emerald-100'
+                          : 'border-ost-border/60 bg-black/20 text-slate-300'
+                      }`}
+                    >
+                      {d.name}{' '}
+                      <span className="text-ost-muted">({d.pageCount} pg)</span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </>
         )}
       </div>
 
-      <div className="border-b border-ost-border p-2">
+      <div className="border-b border-ost-border p-3">
         <button
           type="button"
           onClick={() => setPhaseOpen(!phaseOpen)}
-          className="flex w-full items-center justify-between text-left text-sm font-medium"
+          className="flex w-full items-center justify-between text-left text-sm font-medium text-slate-100"
         >
-          Pages / phases
+          Sheet navigator
           <span className="text-ost-muted">{phaseOpen ? '−' : '+'}</span>
         </button>
         {phaseOpen && (
-          <div className="mt-2 max-h-32 overflow-y-auto text-sm text-ost-muted">
+          <div className="mt-2 max-h-36 overflow-y-auto text-sm text-ost-muted">
             {totalPages === 0 ? (
-              <p>Open a PDF to list pages.</p>
+              <p className="rounded border border-ost-border/70 bg-black/20 px-2 py-2 text-xs">
+                Open a PDF to list sheets.
+              </p>
             ) : (
               <ul className="space-y-1">
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -121,8 +140,10 @@ export function SidebarLeft() {
                     <button
                       type="button"
                       onClick={() => setPage(p)}
-                      className={`w-full rounded px-2 py-1 text-left hover:bg-white/10 ${
-                        p === currentPage ? 'bg-blue-600/30 text-white' : ''
+                      className={`w-full rounded px-2 py-0.5 text-left text-xs hover:bg-white/10 ${
+                        p === currentPage
+                          ? 'border border-blue-600/70 bg-blue-600/25 text-white'
+                          : 'border border-ost-border/60 bg-black/20'
                       }`}
                     >
                       Sheet {p}
@@ -135,65 +156,64 @@ export function SidebarLeft() {
         )}
       </div>
 
-      <div className="border-b border-ost-border p-2">
+      <div className="border-b border-ost-border p-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase text-ost-muted">
+            Conditions
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const name = window.prompt('Condition name');
+              if (!name) return;
+              const kind = window.prompt(
+                'Result type: linear | area_gross | area_net | count | assembly',
+                'linear'
+              ) as ResultKind | null;
+              const ok: ResultKind[] = [
+                'linear',
+                'area_gross',
+                'area_net',
+                'count',
+                'assembly',
+              ];
+              const rk = ok.includes(kind as ResultKind)
+                ? (kind as ResultKind)
+                : 'linear';
+              addCondition({
+                name,
+                color:
+                  '#' +
+                  Math.floor(Math.random() * 0xffffff)
+                    .toString(16)
+                    .padStart(6, '0'),
+                resultKind: rk,
+              });
+            }}
+            className="rounded bg-blue-600 px-2 py-0.5 text-[11px] font-medium hover:bg-blue-500"
+          >
+            + Add
+          </button>
+        </div>
         <input
           type="search"
           placeholder="Search conditions…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded border border-ost-border bg-black/30 px-2 py-1.5 text-sm outline-none focus:border-blue-500"
+          className="mt-2 w-full rounded border border-ost-border bg-black/30 px-2 py-1.5 text-sm outline-none focus:border-blue-500"
         />
       </div>
 
-      <div className="flex items-center justify-between px-2 py-2">
-        <span className="text-xs font-semibold uppercase text-ost-muted">
-          Conditions
-        </span>
-        <button
-          type="button"
-          onClick={() => {
-            const name = window.prompt('Condition name');
-            if (!name) return;
-            const kind = window.prompt(
-              'Result type: linear | area_gross | area_net | count | assembly',
-              'linear'
-            ) as ResultKind | null;
-            const ok: ResultKind[] = [
-              'linear',
-              'area_gross',
-              'area_net',
-              'count',
-              'assembly',
-            ];
-            const rk = ok.includes(kind as ResultKind)
-              ? (kind as ResultKind)
-              : 'linear';
-            addCondition({
-              name,
-              color:
-                '#' +
-                Math.floor(Math.random() * 0xffffff)
-                  .toString(16)
-                  .padStart(6, '0'),
-              resultKind: rk,
-            });
-          }}
-          className="rounded bg-blue-600 px-2 py-1 text-xs font-medium hover:bg-blue-500"
-        >
-          + Condition
-        </button>
-      </div>
-
-      <ul className="flex-1 overflow-y-auto px-1 pb-2">
+      <ul className="flex-1 space-y-1 overflow-y-auto px-2 py-2">
         {filtered.map((c) => (
-          <li key={c.id} className="mb-1 flex gap-0.5">
+          <li key={c.id} className="flex gap-1">
             <button
               type="button"
               onClick={(e) => toggleSel(c.id, e.ctrlKey || e.metaKey)}
-              className={`flex min-w-0 flex-1 items-center gap-2 rounded border px-2 py-2 text-left text-sm transition ${
+              className={`flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm transition ${
                 selected.includes(c.id)
                   ? 'border-blue-500 bg-blue-600/20'
-                  : 'border-transparent hover:bg-white/5'
+                  : 'border-ost-border/60 bg-black/20 hover:bg-white/5'
               }`}
             >
               <span
@@ -218,7 +238,7 @@ export function SidebarLeft() {
                 e.stopPropagation();
                 setEditingConditionId(c.id);
               }}
-              className="shrink-0 rounded border border-transparent px-2 py-2 text-ost-muted hover:border-ost-border hover:bg-white/10 hover:text-white"
+              className="shrink-0 rounded-md border border-transparent px-2 py-1.5 text-ost-muted hover:border-ost-border hover:bg-white/10 hover:text-white"
             >
               ✎
             </button>

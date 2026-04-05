@@ -15,4 +15,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
     ipcRenderer.invoke('invoice:createDb', dbPath, initialProducts),
   getResults: (outDir) => ipcRenderer.invoke('invoice:getResults', outDir),
   openPath: (targetPath) => ipcRenderer.invoke('invoice:openPath', targetPath),
+  pickTakeoffInput: () => ipcRenderer.invoke('takeoff:pickInput'),
+  pickTakeoffOutputDirectory: () => ipcRenderer.invoke('takeoff:pickOutput'),
+  runTakeoff: (options) => ipcRenderer.invoke('takeoff:run', options),
 });

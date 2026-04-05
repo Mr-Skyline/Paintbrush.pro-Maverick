@@ -1,0 +1,9 @@
+# YOLO label format per line:
+# <class_id> <x_center> <y_center> <width> <height>
+# values are normalized 0..1
+# class ids:
+# 0 exterior_wall
+# 1 interior_wall
+# 2 door
+# 3 window
+# 4 fixture

@@ -1,0 +1,12 @@
+path: /workspace/takeoff_agent/train/datasets/fresh_start
+train: images/train
+val: images/val
+test: images/test
+
+nc: 5
+names:
+  0: exterior_wall
+  1: interior_wall
+  2: door
+  3: window
+  4: fixture

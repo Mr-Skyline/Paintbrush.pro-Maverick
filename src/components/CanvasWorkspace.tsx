@@ -956,7 +956,7 @@ export function CanvasWorkspace({ pdfData }: { pdfData: ArrayBuffer | null }) {
   return (
     <div
       ref={wrapRef}
-      className="canvas-stack min-h-[400px] rounded-lg border border-ost-border"
+      className="canvas-stack min-h-[520px] rounded-xl border border-ost-border/80 shadow-[0_8px_28px_rgba(0,0,0,0.45)]"
     >
       <canvas ref={pdfCanvasRef} className="pdf-canvas" />
       <canvas ref={fabricElRef} className="upper-canvas" />

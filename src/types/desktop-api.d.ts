@@ -53,6 +53,25 @@ interface DesktopInvoiceResultsPayload {
   };
 }
 
+interface DesktopTakeoffRunOptions {
+  input: string;
+  outDir: string;
+  configPath?: string;
+  projectId?: string;
+  saveOverlays?: boolean;
+  saveDebugImages?: boolean;
+  enableSupabaseHandoff?: boolean;
+}
+
+interface DesktopTakeoffRunResult {
+  ok: boolean;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  jsonPath?: string;
+  csvPath?: string;
+}
+
 interface DesktopApi {
   pickInvoiceFiles: () => Promise<string[]>;
   pickDbFile: () => Promise<string | null>;
@@ -68,6 +87,9 @@ interface DesktopApi {
   ) => Promise<DesktopDbCreateResult>;
   getResults: (outDir: string) => Promise<DesktopInvoiceResultsPayload>;
   openPath: (targetPath: string) => Promise<boolean>;
+  pickTakeoffInput: () => Promise<string | null>;
+  pickTakeoffOutputDirectory: () => Promise<string | null>;
+  runTakeoffAgent: (options: DesktopTakeoffRunOptions) => Promise<DesktopTakeoffRunResult>;
 }
 
 interface Window {

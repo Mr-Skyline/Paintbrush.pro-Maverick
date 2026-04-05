@@ -1,5 +1,6 @@
 import { useProjectStore } from '@/store/projectStore';
 import type { BoostFinding } from '@/types';
+import { recordAgentTrace } from '@/lib/agentTrace';
 import {
   applyConditionVisualToFabricObject,
   hexAlpha,
@@ -101,6 +102,12 @@ export function applyBoostReviewApproveAll(): {
   const st = useProjectStore.getState();
   const review = st.boostReview;
   if (!review) {
+    recordAgentTrace({
+      category: 'outcome',
+      event: 'review.approve_all_blocked',
+      reason: 'No active review was open when approve all was requested.',
+      result: 'error',
+    });
     return {
       ok: false,
       error: 'No Boost review is open. Call boost_run first.',
@@ -109,8 +116,24 @@ export function applyBoostReviewApproveAll(): {
   const c = (window as unknown as { __takeoffCanvas?: fabric.Canvas })
     .__takeoffCanvas;
   if (!c) {
+    recordAgentTrace({
+      category: 'outcome',
+      event: 'review.approve_all_blocked',
+      reason: 'Canvas was not ready when approve all was requested.',
+      result: 'error',
+    });
     return { ok: false, error: 'Canvas not ready.' };
   }
+  recordAgentTrace({
+    category: 'decision',
+    event: 'review.approve_all_requested',
+    reason: 'User requested to apply all AI findings to the active sheet.',
+    result: 'neutral',
+    context: {
+      findings: review.findings.length,
+      suggestedConditions: review.suggestedConditions.length,
+    },
+  });
   st.applyBoostConditions(review.suggestedConditions);
   for (const f of review.findings) {
     const cond = ensureCondition(
@@ -129,5 +152,12 @@ export function applyBoostReviewApproveAll(): {
   const snap = (window as unknown as { __takeoffPushUndoSnapshot?: () => void })
     .__takeoffPushUndoSnapshot;
   snap?.();
+  recordAgentTrace({
+    category: 'outcome',
+    event: 'review.approve_all_applied',
+    reason: 'Applied all AI findings and suggested conditions to the canvas.',
+    result: 'success',
+    context: { applied },
+  });
   return { ok: true, applied };
 }

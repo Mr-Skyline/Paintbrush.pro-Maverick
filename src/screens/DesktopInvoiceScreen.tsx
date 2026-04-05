@@ -38,6 +38,16 @@ function StatCard({
 
 export function DesktopInvoiceScreen() {
   const desktop = window.desktopApi ?? null;
+  const [takeoffInputPath, setTakeoffInputPath] = useState('');
+  const [takeoffOutputDir, setTakeoffOutputDir] = useState('');
+  const [takeoffProjectId, setTakeoffProjectId] = useState('');
+  const [takeoffConfigPath, setTakeoffConfigPath] = useState('');
+  const [takeoffSaveOverlays, setTakeoffSaveOverlays] = useState(true);
+  const [takeoffSaveDebug, setTakeoffSaveDebug] = useState(false);
+  const [takeoffSupabase, setTakeoffSupabase] = useState(false);
+  const [takeoffRunning, setTakeoffRunning] = useState(false);
+  const [takeoffResult, setTakeoffResult] =
+    useState<DesktopTakeoffRunResult | null>(null);
   const [files, setFiles] = useState<string[]>([]);
   const [dbPath, setDbPath] = useState('');
   const [dbProducts, setDbProducts] = useState<DesktopProductRecord[]>([]);
@@ -283,6 +293,55 @@ export function DesktopInvoiceScreen() {
       );
     } finally {
       setRunning(false);
+    }
+  };
+
+  const pickTakeoffInput = async () => {
+    if (!desktop?.pickTakeoffInput) return;
+    const selected = await desktop.pickTakeoffInput();
+    if (selected) setTakeoffInputPath(selected);
+  };
+
+  const pickTakeoffOutput = async () => {
+    if (!desktop?.pickTakeoffOutputDirectory) return;
+    const selected = await desktop.pickTakeoffOutputDirectory();
+    if (selected) setTakeoffOutputDir(selected);
+  };
+
+  const runTakeoffAgent = async () => {
+    if (!desktop?.runTakeoffAgent) return;
+    if (!takeoffInputPath.trim()) {
+      setDbStatus('Takeoff input file is required.');
+      return;
+    }
+    if (!takeoffOutputDir.trim()) {
+      setDbStatus('Takeoff output folder is required.');
+      return;
+    }
+    setTakeoffRunning(true);
+    setTakeoffResult(null);
+    try {
+      const response = await desktop.runTakeoffAgent({
+        input: takeoffInputPath.trim(),
+        outDir: takeoffOutputDir.trim(),
+        projectId: takeoffProjectId.trim() || undefined,
+        configPath: takeoffConfigPath.trim() || undefined,
+        saveOverlays: takeoffSaveOverlays,
+        saveDebugImages: takeoffSaveDebug,
+        enableSupabaseHandoff: takeoffSupabase,
+      });
+      setTakeoffResult(response);
+      if (response.ok) {
+        setDbStatus('Takeoff agent run completed.');
+      } else {
+        setDbStatus(`Takeoff agent failed (exit ${response.exitCode}).`);
+      }
+    } catch (error) {
+      setDbStatus(
+        `Takeoff run failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    } finally {
+      setTakeoffRunning(false);
     }
   };
 
@@ -610,6 +669,112 @@ export function DesktopInvoiceScreen() {
         </div>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-3xl border border-slate-700/60 bg-slate-900/70 p-6 shadow-[0_18px_60px_rgba(7,10,22,0.45)] lg:col-span-2">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white">Takeoff Agent Runner</h2>
+              <button
+                type="button"
+                onClick={runTakeoffAgent}
+                disabled={!desktop || takeoffRunning}
+                className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_12px_24px_rgba(16,185,129,0.35)] hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+              >
+                {takeoffRunning ? 'Running...' : 'Run Takeoff Agent'}
+              </button>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-slate-700/70 bg-black/20 p-4">
+                <div className="text-sm font-medium text-white">
+                  Blueprint input (PDF/image)
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={pickTakeoffInput}
+                    className="rounded-lg border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  >
+                    Select file
+                  </button>
+                  <input
+                    value={takeoffInputPath}
+                    onChange={(e) => setTakeoffInputPath(e.target.value)}
+                    placeholder="/abs/path/to/plan.pdf"
+                    className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-xs text-white"
+                  />
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-700/70 bg-black/20 p-4">
+                <div className="text-sm font-medium text-white">Output folder</div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={pickTakeoffOutput}
+                    className="rounded-lg border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  >
+                    Select folder
+                  </button>
+                  <input
+                    value={takeoffOutputDir}
+                    onChange={(e) => setTakeoffOutputDir(e.target.value)}
+                    placeholder="/abs/path/to/output"
+                    className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-xs text-white"
+                  />
+                </div>
+              </div>
+              <label className="rounded-xl border border-slate-700/70 bg-black/20 p-4 text-sm">
+                <div className="mb-2 font-medium text-white">Project ID (optional)</div>
+                <input
+                  value={takeoffProjectId}
+                  onChange={(e) => setTakeoffProjectId(e.target.value)}
+                  placeholder="my-project-id"
+                  className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-xs text-white"
+                />
+              </label>
+              <label className="rounded-xl border border-slate-700/70 bg-black/20 p-4 text-sm">
+                <div className="mb-2 font-medium text-white">Config path (optional)</div>
+                <input
+                  value={takeoffConfigPath}
+                  onChange={(e) => setTakeoffConfigPath(e.target.value)}
+                  placeholder="/workspace/takeoff_agent/config.yaml"
+                  className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-xs text-white"
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-300">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={takeoffSaveOverlays}
+                  onChange={(e) => setTakeoffSaveOverlays(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-500 bg-slate-950 text-cyan-400"
+                />
+                Save overlays
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={takeoffSaveDebug}
+                  onChange={(e) => setTakeoffSaveDebug(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-500 bg-slate-950 text-cyan-400"
+                />
+                Save debug images
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={takeoffSupabase}
+                  onChange={(e) => setTakeoffSupabase(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-500 bg-slate-950 text-cyan-400"
+                />
+                Enable Supabase handoff
+              </label>
+            </div>
+            <pre className="mt-4 max-h-64 overflow-auto rounded-xl bg-slate-950/90 p-4 text-xs leading-5 text-emerald-200">
+              {takeoffResult
+                ? `${takeoffResult.stdout}${takeoffResult.stderr ? `\n${takeoffResult.stderr}` : ''}`
+                : 'No takeoff run yet.'}
+            </pre>
+          </div>
+
           <div className="rounded-3xl border border-slate-700/60 bg-slate-900/70 p-6 shadow-[0_18px_60px_rgba(7,10,22,0.45)]">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">
