@@ -120,6 +120,12 @@ def parse_args() -> argparse.Namespace:
         help="PDF render DPI for generated images.",
     )
     ingest_cmd.add_argument(
+        "--recursive",
+        action="store_true",
+        dest="recursive",
+        help="Scan nested folders under source dir (default).",
+    )
+    ingest_cmd.add_argument(
         "--non-recursive",
         action="store_false",
         dest="recursive",
