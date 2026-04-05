@@ -1,0 +1,14 @@
+this is not valid json — intentional malformed fixture line
+{"id":"evt-001","ts":1712345670001,"sessionId":"sess-fixture-1","category":"session","event":"trace_session_started","result":"success","context":{"source":"fixture"}}
+{"id":"evt-002","ts":1712345670100,"sessionId":"sess-fixture-1","category":"session","event":"heartbeat","result":"skipped"}
+{"id":"evt-003","ts":1712345670200,"sessionId":"sess-fixture-1","category":"tool","event":"tool_selected","result":"success","context":{"tool":"area"}}
+{"id":"evt-004","ts":1712345670300,"sessionId":"sess-fixture-1","category":"sheet","event":"sheet_selected","result":"success","context":{"documentId":"fixture-doc","page":1}}
+{"id":"evt-005","ts":1712345670400,"sessionId":"sess-fixture-1","category":"ai","event":"run_ai_takeoff_started","result":"success","context":{}}
+{"id":"evt-006","ts":1712345670500,"sessionId":"sess-fixture-1","category":"review","event":"review_approve_all","result":"neutral","context":{}}
+{"id":"evt-007","ts":1712345670600,"sessionId":"sess-fixture-1","category":"export","event":"export_paintbrush_csv","result":"error","context":{"format":"csv"}}
+{"id":"evt-008","ts":1712345670700,"sessionId":"sess-fixture-1","category":"ai","event":"run_ai_takeoff_started","result":"cancelled","context":{}}
+{"id":"evt-009","ts":1712345670800,"sessionId":"sess-fixture-1","category":"tool","event":"tool_selected","result":"success","context":{"tool":"count"}}
+{"id":"evt-010","ts":1712345670900,"sessionId":"sess-fixture-1","category":"sheet","event":"sheet_selected","result":"success","context":{"documentId":"fixture-doc","page":2}}
+{"id":"evt-011","ts":1712345671000,"sessionId":"sess-fixture-1","category":"ai","event":"run_ai_takeoff_started","result":"success","context":{}}
+{"id":"evt-012","ts":1712345671100,"sessionId":"sess-fixture-1","category":"review","event":"review_approve_all","result":"success","context":{}}
+{"id":"evt-013","ts":1712345671200,"sessionId":"sess-fixture-1","category":"export","event":"export_paintbrush_csv","result":"success","context":{"format":"csv"}}
