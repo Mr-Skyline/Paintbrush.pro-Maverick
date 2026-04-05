@@ -59,6 +59,7 @@ type BoostRunResult = { ok: boolean; error?: string; headline?: string };
 export function WorkspaceLayout() {
   const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
   const [boostOpen, setBoostOpen] = useState(false);
+  const [operatorMode, setOperatorMode] = useState(true);
   const [tracePanelOpen, setTracePanelOpen] = useState(false);
   const [traceWindowOpen, setTraceWindowOpen] = useState(false);
   const [traceWindowBlocked, setTraceWindowBlocked] = useState(false);
@@ -533,6 +534,17 @@ export function WorkspaceLayout() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem('paintbrush.operator_mode.v1');
+    if (raw === 'diagnostics') {
+      setOperatorMode(false);
+      return;
+    }
+    setOperatorMode(true);
+    setTracePanelOpen(false);
+  }, []);
+
+  useEffect(() => {
     return;
   }, []);
 
@@ -592,28 +604,53 @@ export function WorkspaceLayout() {
             >
               Fit view
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTraceWindowBlocked(false);
-                setTraceWindowOpen(true);
-              }}
-              className="rounded border border-ost-border px-2 py-1 text-ost-muted hover:bg-white/10"
-            >
-              Open trace window
-            </button>
-            {traceWindowBlocked ? (
-              <span className="text-[10px] text-amber-300">
-                Popup blocked - using docked trace panel.
-              </span>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setTracePanelOpen((o) => !o)}
-              className="ml-auto rounded border border-ost-border px-2 py-1 text-ost-muted hover:bg-white/10"
-            >
-              {tracePanelOpen ? 'Hide docked trace' : 'Show docked trace'}
-            </button>
+            {operatorMode ? (
+              <button
+                type="button"
+                onClick={() => setOperatorMode(false)}
+                className="ml-auto rounded border border-emerald-700/60 bg-emerald-900/20 px-2 py-1 text-emerald-200 hover:bg-emerald-900/35"
+                title="Enable diagnostics controls"
+              >
+                Diagnostics mode
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTraceWindowBlocked(false);
+                    setTraceWindowOpen(true);
+                  }}
+                  className="rounded border border-ost-border px-2 py-1 text-ost-muted hover:bg-white/10"
+                >
+                  Open trace window
+                </button>
+                {traceWindowBlocked ? (
+                  <span className="text-[10px] text-amber-300">
+                    Popup blocked - using docked trace panel.
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setTracePanelOpen((o) => !o)}
+                  className="rounded border border-ost-border px-2 py-1 text-ost-muted hover:bg-white/10"
+                >
+                  {tracePanelOpen ? 'Hide docked trace' : 'Show docked trace'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTracePanelOpen(false);
+                    setTraceWindowOpen(false);
+                    setOperatorMode(true);
+                  }}
+                  className="ml-auto rounded border border-slate-700/60 bg-slate-900/20 px-2 py-1 text-slate-200 hover:bg-slate-900/35"
+                  title="Return to clean operator UI"
+                >
+                  Operator mode
+                </button>
+              </>
+            )}
           </div>
           <div className="min-h-0 flex-1 overflow-auto p-2">
             <CanvasWorkspace pdfData={pdfData} />
