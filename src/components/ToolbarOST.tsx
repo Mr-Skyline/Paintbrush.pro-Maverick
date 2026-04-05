@@ -48,8 +48,6 @@ export function ToolbarOST({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const tool = useProjectStore((s) => s.tool);
   const setTool = useProjectStore((s) => s.setTool);
-  const conditions = useProjectStore((s) => s.conditions);
-  const selected = useProjectStore((s) => s.selectedConditionIds);
   const pixelsPerFoot = useProjectStore((s) => s.pixelsPerFoot);
   const currentPage = useProjectStore((s) => s.currentPage);
   const totalPages = useProjectStore((s) => s.totalPages);
@@ -137,21 +135,21 @@ export function ToolbarOST({
 
         <div className="flex flex-wrap items-center gap-1 rounded border border-ost-border/70 bg-black/20 p-1">
           <span className="px-1 text-[10px] uppercase tracking-wide text-ost-muted">
-            Condition
+            Sheets
           </span>
           <select
-            className="max-w-[180px] rounded border border-ost-border bg-black/40 px-2 py-1 text-[11px]"
-            value={selected[0] ?? ''}
-            onChange={(e) =>
-              useProjectStore.getState().setSelectedConditions(
-                e.target.value ? [e.target.value] : []
-              )
-            }
+            className="max-w-[190px] rounded border border-ost-border bg-black/40 px-2 py-1 text-[11px]"
+            value={totalPages ? String(currentPage) : ''}
+            onChange={(e) => {
+              const next = Number.parseInt(e.target.value, 10);
+              if (Number.isFinite(next) && next >= 1) setPage(next);
+            }}
+            disabled={!totalPages}
           >
-            <option value="">— Condition —</option>
-            {conditions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+            {!totalPages && <option value="">No sheets loaded</option>}
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <option key={p} value={String(p)}>
+                Sheet {p}
               </option>
             ))}
           </select>
@@ -266,26 +264,9 @@ export function ToolbarOST({
 
           <div className="rounded-lg border border-ost-border/80 bg-black/25 p-2">
             <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ost-muted">
-              Conditions + output
+              Output
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              <select
-                className="max-w-[180px] rounded border border-ost-border bg-black/40 px-2 py-1.5 text-xs"
-                value={selected[0] ?? ''}
-                onChange={(e) =>
-                  useProjectStore.getState().setSelectedConditions(
-                    e.target.value ? [e.target.value] : []
-                  )
-                }
-              >
-                <option value="">— Condition —</option>
-                {conditions.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-
               <label className="flex items-center gap-1 rounded border border-ost-border px-2 py-1 text-[11px] text-ost-muted">
                 px/ft
                 <input
