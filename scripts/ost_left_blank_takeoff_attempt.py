@@ -58,6 +58,40 @@ def focus_window(title_contains: str) -> bool:
         return False
 
 
+def get_ost_window_rect(title_contains: str) -> Dict[str, int] | None:
+    if gw is None:
+        return None
+    try:
+        wins = gw.getWindowsWithTitle(title_contains)
+        if not wins:
+            return None
+        w = wins[0]
+        return {
+            "left": int(w.left),
+            "top": int(w.top),
+            "width": int(w.width),
+            "height": int(w.height),
+        }
+    except Exception:
+        return None
+
+
+def _clamp_point_to_ost_window(
+    x: int, y: int, rect: Dict[str, int] | None, margin: int = 6
+) -> Tuple[int, int, bool]:
+    if not rect or int(rect.get("width", 0) or 0) < 80 or int(rect.get("height", 0) or 0) < 80:
+        return x, y, False
+    left = int(rect["left"]) + margin
+    top = int(rect["top"]) + margin
+    right = int(rect["left"]) + int(rect["width"]) - margin
+    bottom = int(rect["top"]) + int(rect["height"]) - margin
+    if right <= left or bottom <= top:
+        return x, y, False
+    nx = max(left, min(int(x), right))
+    ny = max(top, min(int(y), bottom))
+    return nx, ny, (nx != int(x)) or (ny != int(y))
+
+
 def screenshot_monitor(monitor_index: int, out_file: pathlib.Path) -> None:
     out_file.parent.mkdir(parents=True, exist_ok=True)
     with mss.mss() as sct:
@@ -68,8 +102,16 @@ def screenshot_monitor(monitor_index: int, out_file: pathlib.Path) -> None:
         mss.tools.to_png(shot.rgb, shot.size, output=str(out_file))
 
 
-def click_xy(x: int, y: int, double: bool = False) -> None:
-    pyautogui.moveTo(x, y, duration=0.15)
+def click_xy(
+    x: int,
+    y: int,
+    double: bool = False,
+    ost_rect: Dict[str, int] | None = None,
+) -> None:
+    cx, cy, changed = _clamp_point_to_ost_window(x, y, ost_rect)
+    if changed:
+        print(f"ost_window_clamp from=({x},{y}) to=({cx},{cy})")
+    pyautogui.moveTo(cx, cy, duration=0.15)
     if double:
         pyautogui.doubleClick()
     else:
@@ -147,6 +189,42 @@ def run_item_type_classifier(
         "stderr": proc.stderr.strip(),
         "output_path": str(output_path),
         "summary": summary,
+        "payload": payload,
+    }
+
+
+def run_condition_style_inspector(
+    click_x: int,
+    click_y: int,
+    monitor_index: int,
+    window_title_contains: str,
+    out_json: pathlib.Path,
+    screenshot_path: pathlib.Path | None = None,
+) -> Dict[str, Any]:
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "python",
+        "scripts/ost_condition_style_inspector.py",
+        "--click-x",
+        str(int(click_x)),
+        "--click-y",
+        str(int(click_y)),
+        "--monitor-index",
+        str(int(monitor_index)),
+        "--window-title-contains",
+        str(window_title_contains),
+        "--output-json",
+        str(out_json),
+    ]
+    if screenshot_path is not None:
+        cmd.extend(["--screenshot-path", str(screenshot_path)])
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    payload = read_json(out_json)
+    return {
+        "command": cmd,
+        "exit_code": proc.returncode,
+        "stdout": proc.stdout.strip(),
+        "stderr": proc.stderr.strip(),
         "payload": payload,
     }
 
@@ -373,12 +451,16 @@ def build_self_review(
                 "Condition verification failed before draw."
                 if reason == "condition_verification_failed"
                 else (
-                    "Expected target gate failed; chosen region was too far from Boost region."
-                    if reason == "expected_target_gate_failed"
+                    "Could not read condition Style from the properties dialog (and no safe keyword fallback)."
+                    if reason == "style_inspection_failed"
                     else (
-                        "Click worked, but output did not match quality gates."
-                        if reason in ("quality_gate_failed", "bad_work")
-                        else "No click failure detected."
+                        "Expected target gate failed; chosen region was too far from Boost region."
+                        if reason == "expected_target_gate_failed"
+                        else (
+                            "Click worked, but output did not match quality gates."
+                            if reason in ("quality_gate_failed", "bad_work")
+                            else "No click failure detected."
+                        )
                     )
                 )
             ),
@@ -407,7 +489,11 @@ def build_self_review(
             "answer": (
                 "Tighten preferred condition keywords and add expected target/class gate."
                 if reason in ("condition_verification_failed", "expected_target_gate_failed")
-                else "Increase target-shape fidelity and post-click verification before scoring."
+                else (
+                    "Improve Style OCR (dialog crop, GLM-OCR) or disable strict inspection if debugging."
+                    if reason == "style_inspection_failed"
+                    else "Increase target-shape fidelity and post-click verification before scoring."
+                )
             ),
         },
         {
@@ -551,6 +637,19 @@ def main() -> int:
         default=2,
         help="Always clear existing blocks before attempt (Ctrl+A, Delete).",
     )
+    parser.set_defaults(inspect_condition_style=True, style_keyword_fallback=True)
+    parser.add_argument(
+        "--no-inspect-condition-style",
+        dest="inspect_condition_style",
+        action="store_false",
+        help="Skip opening the condition to OCR the Style field.",
+    )
+    parser.add_argument(
+        "--no-style-keyword-fallback",
+        dest="style_keyword_fallback",
+        action="store_false",
+        help="Do not infer area style when OCR fails but condition keyword lock is verified.",
+    )
     args = parser.parse_args()
 
     out_dir = pathlib.Path(args.output_dir)
@@ -625,6 +724,89 @@ def main() -> int:
         print(f"left_blank_takeoff_attempt={out_dir / 'left_blank_takeoff_attempt.json'}")
         return 4
     time.sleep(0.5)
+
+    ost_rect = get_ost_window_rect(str(args.window_title_contains))
+    sel_inner = condition_selection.get("selection", {}) if isinstance(condition_selection, dict) else {}
+    click_pt = sel_inner.get("click_point", {}) if isinstance(sel_inner, dict) else {}
+    cond_click_x = int(click_pt.get("x", 0) or 0) if isinstance(click_pt, dict) else 0
+    cond_click_y = int(click_pt.get("y", 0) or 0) if isinstance(click_pt, dict) else 0
+
+    condition_style = ""
+    style_inspection_run: Dict[str, Any] = {}
+    style_inspection_ok = not bool(args.inspect_condition_style)
+    style_keyword_fallback_applied = False
+    if bool(args.inspect_condition_style):
+        if cond_click_x > 0 and cond_click_y > 0:
+            style_inspection_run = run_condition_style_inspector(
+                click_x=cond_click_x,
+                click_y=cond_click_y,
+                monitor_index=int(args.monitor_index),
+                window_title_contains=str(args.window_title_contains),
+                out_json=out_dir / "condition_style_inspection.json",
+                screenshot_path=out_dir / "condition_style_dialog.png",
+            )
+            pl = style_inspection_run.get("payload", {})
+            if isinstance(pl, dict):
+                condition_style = str(pl.get("style", "") or "").strip().lower()
+                style_inspection_ok = bool(pl.get("style_inspection_ok") or pl.get("ok"))
+        else:
+            style_inspection_run = {
+                "ok": False,
+                "reason": "missing_condition_click_point",
+                "payload": {},
+            }
+
+        if not style_inspection_ok and bool(args.style_keyword_fallback):
+            kw = str(condition_verification.get("selected_keyword", "") or "").lower()
+            verified_kw = bool(condition_verification.get("preferred_keyword_hit")) and bool(
+                condition_verification.get("verified")
+            )
+            ceilingish = verified_kw and (
+                any(t in kw for t in ("ceil", "gwb", "gyp", "gypsum", "drywall"))
+                or kw in ("ceiling",)
+            )
+            if ceilingish:
+                condition_style = condition_style or "area"
+                style_inspection_ok = True
+                style_keyword_fallback_applied = True
+                style_inspection_run = dict(style_inspection_run)
+                style_inspection_run["keyword_fallback"] = {
+                    "applied": True,
+                    "inferred_style": "area",
+                    "matched_keyword": kw,
+                }
+
+        if not style_inspection_ok:
+            result = {
+                "ok": False,
+                "timestamp": now_tag(),
+                "focused_window": focused,
+                "ost_window_rect": ost_rect,
+                "condition_row": args.condition_row,
+                "condition_selection": condition_selection,
+                "condition_selection_attempts": condition_selection_attempts,
+                "condition_verification": condition_verification,
+                "condition_style": condition_style,
+                "condition_style_inspection": style_inspection_run,
+                "style_inspection_ok": False,
+                "style_keyword_fallback_applied": bool(style_keyword_fallback_applied),
+                "reason": "style_inspection_failed",
+                "self_review": build_self_review(
+                    reason="style_inspection_failed",
+                    condition_verification=condition_verification,
+                ),
+            }
+            write_json(out_dir / "left_blank_takeoff_attempt.json", result)
+            print(f"left_blank_takeoff_attempt={out_dir / 'left_blank_takeoff_attempt.json'}")
+            return 4
+
+    stroke_mode = str(args.attempt_style)
+    if condition_style == "linear":
+        stroke_mode = "polyline2"
+    elif condition_style == "count":
+        stroke_mode = "point"
+    elif condition_style in ("area", "attachment"):
+        stroke_mode = "polyline4"
 
     grouping_out = out_dir / "grouping_before_left_click.json"
     proc = subprocess.run(
@@ -735,7 +917,7 @@ def main() -> int:
 
     pre_click_source = verify_payload if isinstance(verify_payload, dict) and verify_payload else payload
     stroke_points: List[Dict[str, int]] = []
-    if args.attempt_style == "polyline4":
+    if stroke_mode == "polyline4":
         gb = _bbox_global_from_candidate(pre_click_source, left_target_candidate)
         gx, gy, gw, gh = gb["x"], gb["y"], gb["w"], gb["h"]
         if gw > 48 and gh > 48:
@@ -745,20 +927,20 @@ def main() -> int:
             p2 = {"x": int(gx + gw - inset), "y": int(gy + inset)}
             p3 = {"x": int(gx + gw - inset), "y": int(gy + gh - inset)}
             p4 = {"x": int(gx + inset), "y": int(gy + gh - inset)}
-            click_xy(p1["x"], p1["y"])
+            click_xy(p1["x"], p1["y"], ost_rect=ost_rect)
             time.sleep(0.34)
-            click_xy(p2["x"], p2["y"])
+            click_xy(p2["x"], p2["y"], ost_rect=ost_rect)
             time.sleep(0.34)
-            click_xy(p3["x"], p3["y"])
+            click_xy(p3["x"], p3["y"], ost_rect=ost_rect)
             time.sleep(0.34)
-            click_xy(p4["x"], p4["y"], double=True)
+            click_xy(p4["x"], p4["y"], double=True, ost_rect=ost_rect)
             stroke_points = [p1, p2, p3, p4]
         else:
-            click_xy(left_target_x, left_target_y)
+            click_xy(left_target_x, left_target_y, ost_rect=ost_rect)
             time.sleep(0.55)
-            click_xy(left_target_x, left_target_y, double=True)
+            click_xy(left_target_x, left_target_y, double=True, ost_rect=ost_rect)
             stroke_points = [{"x": left_target_x, "y": left_target_y}]
-    elif args.attempt_style == "polyline2":
+    elif stroke_mode == "polyline2":
         gb = _bbox_global_from_candidate(pre_click_source, left_target_candidate)
         gx, gy, gw, gh = gb["x"], gb["y"], gb["w"], gb["h"]
         if gw > 40 and gh > 40:
@@ -766,19 +948,19 @@ def main() -> int:
             p1y = int(gy + (gh * 0.38))
             p2x = int(gx + (gw * 0.70))
             p2y = int(gy + (gh * 0.72))
-            click_xy(p1x, p1y)
+            click_xy(p1x, p1y, ost_rect=ost_rect)
             time.sleep(0.55)
-            click_xy(p2x, p2y, double=True)
+            click_xy(p2x, p2y, double=True, ost_rect=ost_rect)
             stroke_points = [{"x": p1x, "y": p1y}, {"x": p2x, "y": p2y}]
         else:
-            click_xy(left_target_x, left_target_y)
+            click_xy(left_target_x, left_target_y, ost_rect=ost_rect)
             time.sleep(0.8)
-            click_xy(left_target_x, left_target_y, double=True)
+            click_xy(left_target_x, left_target_y, double=True, ost_rect=ost_rect)
             stroke_points = [{"x": left_target_x, "y": left_target_y}]
     else:
-        click_xy(left_target_x, left_target_y)
+        click_xy(left_target_x, left_target_y, ost_rect=ost_rect)
         time.sleep(0.8)
-        click_xy(left_target_x, left_target_y, double=True)
+        click_xy(left_target_x, left_target_y, double=True, ost_rect=ost_rect)
         stroke_points = [{"x": left_target_x, "y": left_target_y}]
     time.sleep(0.6)
 
@@ -832,6 +1014,13 @@ def main() -> int:
         "ok": True,
         "timestamp": now_tag(),
         "focused_window": focused,
+        "ost_window_rect": ost_rect,
+        "condition_style": condition_style,
+        "condition_style_inspection": style_inspection_run,
+        "style_inspection_ok": bool(style_inspection_ok),
+        "style_keyword_fallback_applied": bool(style_keyword_fallback_applied),
+        "stroke_mode_effective": stroke_mode,
+        "attempt_style_cli": str(args.attempt_style),
         "condition_row": args.condition_row,
         "row_anchor_name": row_anchor_name,
         "row_anchor_click": {"x": int(row_anchor.get("x", 0)), "y": int(row_anchor.get("y", 0))},
@@ -883,7 +1072,7 @@ def main() -> int:
         "left_target_candidate": left_target_candidate,
         "left_blank_click": {"x": left_target_x, "y": left_target_y},
         "pre_attempt_visible_delay_ms": int(args.pre_attempt_visible_delay_ms),
-        "attempt_style": args.attempt_style,
+        "attempt_style": stroke_mode,
         "stroke_points": stroke_points,
         "post_attempt_probe_point": probe_point,
         "post_attempt_nearest_candidate": post_candidate,
