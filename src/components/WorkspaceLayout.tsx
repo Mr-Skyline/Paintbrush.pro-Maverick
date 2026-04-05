@@ -7,6 +7,7 @@ import { SidebarLeft } from '@/components/SidebarLeft';
 import { StatusBar } from '@/components/StatusBar';
 import { ToolbarOST } from '@/components/ToolbarOST';
 import { VoiceControls } from '@/components/VoiceControls';
+import { TraceWindow } from '@/components/TraceWindow';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { loadPdfBlob, savePdfBlob } from '@/lib/indexedProjectDb';
 import { buildOstProjectFile } from '@/lib/serializeOst';
@@ -59,6 +60,8 @@ export function WorkspaceLayout() {
   const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
   const [boostOpen, setBoostOpen] = useState(false);
   const [tracePanelOpen, setTracePanelOpen] = useState(false);
+  const [traceWindowOpen, setTraceWindowOpen] = useState(false);
+  const [traceWindowBlocked, setTraceWindowBlocked] = useState(false);
   const [traceUiTick, setTraceUiTick] = useState(0);
 
   const openProjectId = useNavigationStore((s) => s.openProjectId);
@@ -529,6 +532,10 @@ export function WorkspaceLayout() {
     return () => window.removeEventListener('agent-trace:export', onExport);
   }, []);
 
+  useEffect(() => {
+    return;
+  }, []);
+
   return (
     <div
       className="flex h-full flex-col"
@@ -587,24 +594,27 @@ export function WorkspaceLayout() {
             </button>
             <button
               type="button"
+              onClick={() => {
+                setTraceWindowBlocked(false);
+                setTraceWindowOpen(true);
+              }}
+              className="rounded border border-ost-border px-2 py-1 text-ost-muted hover:bg-white/10"
+            >
+              Open trace window
+            </button>
+            {traceWindowBlocked ? (
+              <span className="text-[10px] text-amber-300">
+                Popup blocked - using docked trace panel.
+              </span>
+            ) : null}
+            <button
+              type="button"
               onClick={() => setTracePanelOpen((o) => !o)}
               className="ml-auto rounded border border-ost-border px-2 py-1 text-ost-muted hover:bg-white/10"
             >
-              {tracePanelOpen ? 'Hide trace' : 'Trace'}
+              {tracePanelOpen ? 'Hide docked trace' : 'Show docked trace'}
             </button>
           </div>
-          {tracePanelOpen ? (
-            <AgentTracePanel
-              refreshKey={traceUiTick}
-              onAfterMutate={() => setTraceUiTick((n) => n + 1)}
-              onReplay={() => void replayLastSupportedActions()}
-              onReplayDryRun={() => void replayLastSupportedActions({ dryRun: true })}
-              onReplaySession={() => void replayLastSupportedActions({ sessionOnly: true })}
-              onReplaySessionDryRun={() =>
-                void replayLastSupportedActions({ dryRun: true, sessionOnly: true })
-              }
-            />
-          ) : null}
           <div className="min-h-0 flex-1 overflow-auto p-2">
             <CanvasWorkspace pdfData={pdfData} />
           </div>
@@ -613,6 +623,42 @@ export function WorkspaceLayout() {
         <RightSidebarProperties />
       </div>
       <StatusBar />
+      {traceWindowOpen ? (
+        <TraceWindow
+          open={traceWindowOpen}
+          title="Takeoff Trace Monitor"
+          onClose={() => setTraceWindowOpen(false)}
+          onBlocked={() => {
+            setTraceWindowBlocked(true);
+            setTracePanelOpen(true);
+          }}
+        >
+          <AgentTracePanel
+            refreshKey={traceUiTick}
+            onAfterMutate={() => setTraceUiTick((n) => n + 1)}
+            onReplay={() => void replayLastSupportedActions()}
+            onReplayDryRun={() => void replayLastSupportedActions({ dryRun: true })}
+            onReplaySession={() => void replayLastSupportedActions({ sessionOnly: true })}
+            onReplaySessionDryRun={() =>
+              void replayLastSupportedActions({ dryRun: true, sessionOnly: true })
+            }
+          />
+        </TraceWindow>
+      ) : null}
+      {tracePanelOpen ? (
+        <div className="fixed right-3 top-36 z-40 w-[min(36rem,calc(100vw-2rem))] max-h-[70vh] overflow-auto rounded border border-ost-border bg-ost-panel/95 shadow-2xl backdrop-blur">
+          <AgentTracePanel
+            refreshKey={traceUiTick}
+            onAfterMutate={() => setTraceUiTick((n) => n + 1)}
+            onReplay={() => void replayLastSupportedActions()}
+            onReplayDryRun={() => void replayLastSupportedActions({ dryRun: true })}
+            onReplaySession={() => void replayLastSupportedActions({ sessionOnly: true })}
+            onReplaySessionDryRun={() =>
+              void replayLastSupportedActions({ dryRun: true, sessionOnly: true })
+            }
+          />
+        </div>
+      ) : null}
       <ReviewPanel />
       <BoostDialog
         open={boostOpen}
