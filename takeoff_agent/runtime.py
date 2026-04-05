@@ -73,6 +73,7 @@ def maybe_emit_supabase_handoff(
     payload: dict[str, Any],
     output_dir: Path,
     project_id: str,
+    idempotency_key: str = "",
     logger: logging.Logger | None = None,
 ) -> Path:
     """
@@ -87,6 +88,7 @@ def maybe_emit_supabase_handoff(
 
     handoff_payload: dict[str, Any] = {
         "project_id": project_id,
+        "idempotency_key": idempotency_key,
         "created_at_utc": _now_iso(),
         "totals": payload.get("totals", {}),
         "pages_processed": payload.get("pages_processed", 0),
@@ -135,6 +137,7 @@ def maybe_emit_supabase_handoff(
             "meta": {
                 "source_input": payload.get("source_input", ""),
                 "pages_processed": payload.get("pages_processed", 0),
+                "idempotency_key": idempotency_key,
             },
         }
         try:

@@ -1,20 +1,11 @@
 # Paintbrush Takeoff Agent (Standalone CV Pipeline)
 
-This package implements a **standalone blueprint takeoff pipeline**:
+This package implements a standalone blueprint takeoff pipeline:
 
-1. Input file (PDF/image) → preprocess
+1. Input file (PDF/image) -> preprocess
 2. CV detection (walls/rooms/counts)
 3. Post-process + quantity calculation
 4. Export JSON + CSV for downstream handoff
-
-## Files
-
-- `main.py` — entry point and export wiring
-- `preprocess.py` — input normalization, scale detection, denoise
-- `detection.py` — baseline CV detection (line/room/symbol)
-- `postprocess.py` — geometry cleanup + quantity calculations
-- `config.yaml` — thresholds and defaults
-- `requirements.txt` — Python dependencies
 
 ## Quick start
 
@@ -30,38 +21,62 @@ python -m takeoff_agent.main \
   --enable-supabase-handoff
 ```
 
+## Batch runner
+
+Run multiple jobs from a queue JSON file:
+
+```bash
+python -m takeoff_agent.batch_runner \
+  --queue takeoff_agent/batch_queue.example.json \
+  --continue-on-error
+```
+
+Queue format:
+
+```json
+[
+  {
+    "input": "/abs/path/plan1.png",
+    "project_id": "job-001",
+    "out": "/abs/path/output/job-001",
+    "save_overlays": true,
+    "enable_supabase_handoff": true
+  }
+]
+```
+
+Each run writes a deterministic `idempotency_key` into:
+
+- `takeoff-results.json`
+- `handoff/<project>-supabase-handoff.json`
+
 ## Runtime reliability features
 
-- Detection retry: if page confidence is below configured threshold, the page is retried with a downscaled image.
-- Structured runtime log files: per-run `logs/run.log` and `logs/errors.jsonl`.
-- Optional overlay rendering: annotated image output with walls/rooms/counts.
-- Optional Supabase handoff: writes handoff payload under `handoff/` and attempts direct insert only when `SUPABASE_URL` + key are available. Local runs never hard-fail on handoff.
+- Detection retry for low-confidence pages.
+- Structured logs in `logs/run.log` and `logs/errors.jsonl`.
+- Optional overlay rendering.
+- Optional Supabase handoff that never blocks local completion.
 
 ## Optional environment variables
 
-Set these only when enabling direct Supabase inserts:
+Use these for direct Supabase inserts:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY` (preferred) or `SUPABASE_ANON_KEY`
+- `SUPABASE_TAKEOFF_TABLE` (default: `estimates`)
+- `SUPABASE_TAKEOFF_BUCKET` (default: `takeoffs`)
 
 ## Outputs
 
 - `takeoff-results.json`
 - `takeoff-results.csv`
 
-The JSON contains:
-
-- `walls`: line segments + LF
-- `rooms`: polygons + SF
-- `counts`: symbol counts by class
-- `meta`: source, page, scale, confidence
+The JSON includes walls, rooms, counts, scale/confidence metadata, and idempotency.
 
 ## Notes
 
-- Current detection is a robust baseline using OpenCV primitives and heuristics.
-- `ultralytics`/`paddleocr` are included in dependencies for incremental migration to trainable detectors/OCR-based scale detection.
-- YOLO integration is optional and activated when model paths are configured in `config.yaml`.
-- YOLO config supports both keys for compatibility:
+- Current detection uses a robust OpenCV baseline with optional YOLO path.
+- YOLO config supports:
   - `model_path` (preferred)
   - `wall_model_path` (legacy alias)
-- Error handling writes structured logs to `output/.../logs/errors.jsonl`.
+- Runtime error handling writes structured entries to `output/.../logs/errors.jsonl`.

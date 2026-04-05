@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 
 from .detection import run_detection
+from .idempotency import build_idempotency_key
 from .postprocess import aggregate_quantities, finalize_page_results
 from .preprocess import denoise_and_threshold, load_config, load_plan_pages
 from .runtime import (
@@ -56,6 +57,11 @@ def parse_args() -> argparse.Namespace:
         "--project-id",
         default="local-dev-project",
         help="Project id used in exported metadata.",
+    )
+    parser.add_argument(
+        "--idempotency-key",
+        default="",
+        help="Optional idempotency key override for handoff deduplication.",
     )
     parser.add_argument(
         "--enable-supabase-handoff",
@@ -281,9 +287,19 @@ def main() -> int:
             continue
 
     totals = aggregate_quantities(per_page)
+    idempotency_key = (
+        args.idempotency_key.strip()
+        or build_idempotency_key(
+            project_id=args.project_id,
+            input_path=Path(args.input),
+            config=config,
+            agent_version="dev",
+        )
+    )
     payload = {
         "project_id": args.project_id,
         "source_input": str(Path(args.input).resolve()),
+        "idempotency_key": idempotency_key,
         "pages_processed": len(per_page),
         "totals": totals,
         "pages": per_page,
@@ -333,6 +349,7 @@ def main() -> int:
             payload=payload,
             output_dir=output_dir,
             project_id=args.project_id,
+            idempotency_key=idempotency_key,
             logger=logger,
         )
 
