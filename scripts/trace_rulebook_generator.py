@@ -1,230 +1,302 @@
 #!/usr/bin/env python3
 """
-Build a markdown rulebook template from an exported agent trace JSONL file.
+Build a markdown rulebook from an exported agent trace JSONL file.
 
-Each line should be a JSON object with at least `event` (string). Optional
-fields `category`, `result`, `ts` match the app's AgentTraceEvent shape.
-Only events with successful `result` are used when forming subsequences.
+Each line is one JSON object. Expected keys align with AgentTraceEvent:
+id, ts, event, category, result, optional context. Malformed lines are skipped
+and counted.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import re
 import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
 
 
-SUCCESS_RESULTS = frozenset({"success", "ok"})
+FAILURE_RESULTS = frozenset({"failure", "error", "cancelled"})
 
-# Categories / name hints for "workflow-critical" steps (Lane D prioritization).
-def _event_is_interesting(event: str, category: str) -> bool:
-    ev = event.lower()
-    cat = category.lower()
-    if "upload" in ev:
-        return True
-    if cat == "sheet" or "sheet" in ev:
-        return True
-    if cat == "tool" or ev == "tool_selected" or ("tool" in ev and "trace" not in ev):
-        return True
-    if cat == "ai" or "boost" in ev or "takeoff" in ev or "ai_takeoff" in ev:
-        return True
-    if cat == "review" or "review" in ev:
-        return True
-    if cat == "export" or "export" in ev or ("download" in ev and "zip" in ev):
-        return True
-    return False
+# Events with replay handlers in src/lib/agentTrace.ts (replayAgentTraceSequence).
+REPLAY_EVENT_NAMES = frozenset(
+    {
+        "tool_selected",
+        "sheet_selected",
+        "run_ai_takeoff_started",
+        "review_approve_all",
+        "export_paintbrush_csv",
+    }
+)
 
 
-def _parse_line(line: str) -> dict[str, Any] | None:
-    line = line.strip()
-    if not line:
+def _parse_row(line: str) -> dict[str, Any] | None:
+    s = line.strip()
+    if not s:
         return None
     try:
-        obj = json.loads(line)
+        obj = json.loads(s)
     except json.JSONDecodeError:
         return None
     if not isinstance(obj, dict):
         return None
-    event = obj.get("event")
-    if not isinstance(event, str) or not event.strip():
+    ev = obj.get("event")
+    if not isinstance(ev, str) or not ev.strip():
         return None
     return obj
 
 
-def _is_success(obj: dict[str, Any]) -> bool:
-    r = obj.get("result", "success")
-    return isinstance(r, str) and r in SUCCESS_RESULTS
+def _norm_result(obj: dict[str, Any]) -> str:
+    r = obj.get("result", "unknown")
+    if not isinstance(r, str):
+        return "unknown"
+    r = r.strip().lower()
+    if r == "ok":
+        return "success"
+    if r in ("success", "failure", "cancelled", "skipped", "pending", "unknown"):
+        return r
+    if r == "error":
+        return "failure"
+    return "unknown"
 
 
-def _load_success_events(path: Path) -> list[tuple[str, str]]:
-    """Return list of (event_name, category) for successful trace rows."""
-    out: list[tuple[str, str]] = []
-    text = path.read_text(encoding="utf-8", errors="replace")
-    for line in text.splitlines():
-        row = _parse_line(line)
-        if row is None:
-            continue
-        if not _is_success(row):
-            continue
-        cat = row.get("category", "")
-        if not isinstance(cat, str):
-            cat = str(cat)
-        out.append((row["event"], cat))
-    return out
+def _category(obj: dict[str, Any]) -> str:
+    c = obj.get("category", "")
+    return c if isinstance(c, str) else ""
 
 
-def _sliding_windows(
-    items: list[tuple[str, str]], min_len: int, max_len: int
-) -> Iterable[tuple[tuple[str, ...], tuple[str, ...]]]:
-    """Yield (event_chain, category_chain) for each window."""
-    n = len(items)
-    if n < min_len:
+def _iter_ngrams(
+    names: list[str], n: int
+) -> Iterable[tuple[tuple[str, ...], int]]:
+    """Yield (ngram_tuple, index_of_last_event) for each window of length n."""
+    if len(names) < n:
         return
-    events = [t[0] for t in items]
-    cats = [t[1] for t in items]
-    for i in range(n):
-        for length in range(min_len, max_len + 1):
-            j = i + length
-            if j > n:
-                break
-            yield (tuple(events[i:j]), tuple(cats[i:j]))
+    for i in range(len(names) - n + 1):
+        yield (tuple(names[i : i + n]), i + n - 1)
 
 
-def _rule_id(chain: tuple[str, ...]) -> str:
-    h = hashlib.sha256(" | ".join(chain).encode("utf-8")).hexdigest()[:8]
-    return f"RB-{h}"
-
-
-_INTENT_OVERRIDES: dict[str, str] = {
-    "session_start": "start a trace session",
-    "session_end": "end a trace session",
-    "workspace_pdf_upload_started": "start uploading plan PDFs",
-    "workspace_pdf_upload_completed": "finish uploading plan PDFs",
-    "workspace_pdf_upload_failed": "hit an upload failure",
-    "sheet_selected": "select a plan sheet",
-    "tool_selected": "select a markup tool",
-    "open_ai_takeoff_dialog": "open the AI takeoff dialog",
-    "workspace_run_boost_started": "start an AI boost run",
-    "workspace_run_boost_success": "complete an AI boost run successfully",
-    "workspace_run_boost_failed": "see an AI boost run fail",
-    "review_approve_all": "approve all items in review",
-    "review_approve_all_outcome": "finish bulk review approval",
-    "review_add_conditions_only": "add reviewed conditions only",
-    "review_add_conditions_only_outcome": "finish add-conditions-only review action",
-    "review_dismiss": "dismiss the review panel",
-    "export_paintbrush_csv": "export Paintbrush CSV",
-    "export_project_zip": "export a project ZIP",
-    "workspace_export_paintbrush": "export Paintbrush data from the workspace",
-    "workspace_download_zip_started": "start downloading a project ZIP",
-    "workspace_download_zip": "download a project ZIP",
-    "workspace_save_manual": "save the project manually",
-    "workspace_sync_disk": "sync the project to disk",
-    "workspace_page_nav": "navigate to another plan page",
-    "trace_cleared": "clear the agent trace",
-    "save_project": "save the project",
-    "sync_project_to_disk": "sync the project to disk",
-}
-
-
-def _phrase_for_event(name: str) -> str:
-    if name in _INTENT_OVERRIDES:
-        return _INTENT_OVERRIDES[name]
-    base = name
-    if base.startswith("workspace_"):
-        base = base[len("workspace_") :]
-    base = base.replace("_", " ")
-    base = re.sub(r"\s+", " ", base).strip()
-    return base or name
-
-
-def infer_intent(chain: tuple[str, ...]) -> str:
-    if not chain:
-        return "No events in chain."
-    phrases = [_phrase_for_event(e) for e in chain]
-    if len(phrases) == 1:
-        return f"The user likely intended to {phrases[0]}."
-    joined = ", then ".join(phrases[:-1]) + f", then {phrases[-1]}"
-    return f"The user likely intended to {joined}."
-
-
-def _chain_priority(chain: tuple[str, ...], cats: tuple[str, ...]) -> int:
+def _interesting_bonus(chain: tuple[str, ...], categories: list[str]) -> int:
+    """Higher score = more workflow-salient (used as tie-breaker)."""
     score = 0
-    for ev, cat in zip(chain, cats):
-        if _event_is_interesting(ev, cat):
+    for name in chain:
+        low = name.lower()
+        if "upload" in low:
+            score += 2
+        if "sheet" in low or low == "tool_selected":
             score += 1
+        if "takeoff" in low or "boost" in low or "ai" in low:
+            score += 1
+        if "review" in low:
+            score += 1
+        if "export" in low or "download" in low:
+            score += 1
+    for i, _name in enumerate(chain):
+        if i < len(categories):
+            cat = categories[i].lower()
+            if cat in ("sheet", "tool", "ai", "review", "export"):
+                score += 1
     return score
+
+
+def _format_chain(chain: tuple[str, ...]) -> str:
+    return " -> ".join(chain)
+
+
+def _load_trace(path: Path) -> tuple[list[dict[str, Any]], int]:
+    """Return (valid rows in order, malformed_line_count)."""
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    rows: list[dict[str, Any]] = []
+    malformed = 0
+    for line in raw.splitlines():
+        row = _parse_row(line)
+        if row is None:
+            if line.strip():
+                malformed += 1
+            continue
+        rows.append(row)
+    return rows, malformed
+
+
+def _rows_to_parallel(
+    rows: list[dict[str, Any]],
+) -> tuple[list[str], list[str], list[str]]:
+    names: list[str] = []
+    results: list[str] = []
+    categories: list[str] = []
+    for r in rows:
+        names.append(str(r["event"]).strip())
+        results.append(_norm_result(r))
+        categories.append(_category(r))
+    return names, results, categories
 
 
 def generate_markdown(
     path: Path,
     min_frequency: int,
+    max_rules: int,
     input_display: str,
 ) -> str:
-    items = _load_success_events(path)
-    counts: Counter[tuple[str, ...]] = Counter()
-    cat_by_chain: dict[tuple[str, ...], tuple[str, ...]] = {}
+    rows, malformed_lines = _load_trace(path)
+    names, results, categories = _rows_to_parallel(rows)
 
-    for ev_chain, cat_chain in _sliding_windows(items, 3, 6):
-        counts[ev_chain] += 1
-        cat_by_chain[ev_chain] = cat_chain
+    n_events = len(names)
+    result_counts: Counter[str] = Counter(results)
+    success_n = result_counts.get("success", 0)
+    failure_n = result_counts.get("failure", 0)
+    cancelled_n = result_counts.get("cancelled", 0)
 
-    filtered = [(c, f) for c, f in counts.items() if f >= min_frequency]
-    # Sort: more "interesting" events in chain, then higher frequency, then longer (more specific).
-    filtered.sort(
+    terminal_fail_or_cancel = failure_n + cancelled_n
+    denom_for_error_rate = success_n + terminal_fail_or_cancel
+    error_rate = (
+        (terminal_fail_or_cancel / denom_for_error_rate)
+        if denom_for_error_rate
+        else 0.0
+    )
+    error_heavy = error_rate >= 0.15 and terminal_fail_or_cancel >= 3
+
+    success_patterns: Counter[tuple[str, ...]] = Counter()
+    for n in (2, 3):
+        for chain, last_idx in _iter_ngrams(names, n):
+            if results[last_idx] == "success":
+                success_patterns[chain] += 1
+
+    success_filtered = [
+        (c, f) for c, f in success_patterns.items() if f >= min_frequency
+    ]
+
+    def cats_for_chain(chain: tuple[str, ...]) -> list[str]:
+        """Categories for one occurrence of chain (prefer last window in file)."""
+        L = len(chain)
+        for i in range(len(names) - L, -1, -1):
+            if tuple(names[i : i + L]) == chain:
+                return categories[i : i + L]
+        return [""] * L
+
+    success_filtered.sort(
         key=lambda cf: (
-            -_chain_priority(cf[0], cat_by_chain[cf[0]]),
             -cf[1],
             -len(cf[0]),
+            -_interesting_bonus(cf[0], cats_for_chain(cf[0])),
             cf[0],
         )
     )
 
+    top_success = success_filtered[:max_rules]
+
+    deterministic: list[tuple[tuple[str, ...], int]] = []
+    for chain, freq in success_filtered:
+        if all(e in REPLAY_EVENT_NAMES for e in chain):
+            deterministic.append((chain, freq))
+    deterministic = deterministic[:max_rules]
+
+    failure_patterns: Counter[tuple[str, ...]] = Counter()
+    for n in (2, 3):
+        for chain, last_idx in _iter_ngrams(names, n):
+            if results[last_idx] in FAILURE_RESULTS:
+                failure_patterns[chain] += 1
+    failure_filtered = [
+        (c, f) for c, f in failure_patterns.items() if f >= min_frequency
+    ]
+    failure_filtered.sort(key=lambda cf: (-cf[1], -len(cf[0]), cf[0]))
+    failure_top = failure_filtered[:max_rules]
+
     lines: list[str] = [
         "# Trace-derived rulebook (draft)",
         "",
-        f"Source: `{input_display}`",
-        f"Successful events considered: **{len(items)}** · Minimum sequence frequency: **{min_frequency}**",
+        "## Summary stats",
         "",
-        "Subsequences are **3–6** consecutive successful events (sliding window). "
-        "Rules that touch upload, sheet, tool, AI/boost/takeoff, review, or export-style "
-        "steps are listed first.",
-        "",
-        "## Rules",
+        f"- **Source:** `{input_display}`",
+        f"- **Valid JSON rows:** {n_events}",
+        f"- **Malformed lines skipped:** {malformed_lines}",
+        f"- **Unique event names:** {len(set(names))}",
+        f"- **Result tallies:** success={success_n}, failure={failure_n}, "
+        f"cancelled={cancelled_n}, skipped={result_counts.get('skipped', 0)}, "
+        f"pending={result_counts.get('pending', 0)}, unknown={result_counts.get('unknown', 0)}",
+        f"- **Min frequency threshold:** {min_frequency}",
+        f"- **Max rules (cap):** {max_rules}",
+        "- **N-gram sizes:** bigrams and trigrams (terminal step filters per section below)",
         "",
     ]
 
-    if not filtered:
-        lines.append("_No subsequences met the frequency threshold._")
+    lines.append("## Top successful patterns")
+    lines.append("")
+    lines.append(
+        "Frequent **bigrams** and **trigrams** of `event` names where the **last** "
+        "step has result `success` (or legacy `ok`). Sorted by count, then length, "
+        "then workflow salience."
+    )
+    lines.append("")
+    if not top_success:
+        lines.append("_No patterns met the frequency threshold._")
         lines.append("")
-        return "\n".join(lines)
+    else:
+        for rank, (chain, freq) in enumerate(top_success, start=1):
+            lines.append(f"{rank}. `{_format_chain(chain)}` -- count **{freq}**")
+        lines.append("")
 
-    for chain, freq in filtered:
-        rid = _rule_id(chain)
-        chain_md = " → ".join(f"`{e}`" for e in chain)
-        intent = infer_intent(chain)
-        lines.append(f"### {rid} — frequency {freq}")
+    lines.append("## Candidate deterministic replay patterns")
+    lines.append("")
+    lines.append(
+        "Subsequences where every event name is one of: "
+        + ", ".join(f"`{x}`" for x in sorted(REPLAY_EVENT_NAMES))
+        + ". Same success-ending filter and frequency threshold as above."
+    )
+    lines.append("")
+    if not deterministic:
+        lines.append("_No qualifying replay-only chains met the threshold._")
         lines.append("")
-        lines.append(f"- **Event chain:** {chain_md}")
-        lines.append(f"- **Inferred intent:** {intent}")
+    else:
+        for rank, (chain, freq) in enumerate(deterministic, start=1):
+            lines.append(f"{rank}. `{_format_chain(chain)}` -- count **{freq}**")
         lines.append("")
+
+    lines.append("## Low-confidence / needs-human patterns")
+    lines.append("")
+    if not error_heavy:
+        lines.append(
+            "Omitted: trace is not **error-heavy** "
+            "(failure+cancelled rate below 15% or fewer than 3 such outcomes)."
+        )
+        lines.append("")
+    else:
+        lines.append(
+            f"Trace looks **error-heavy** (~{error_rate * 100:.1f}% of "
+            "success+failure+cancelled outcomes are failure or cancelled). "
+            "Frequent **bigrams/trigrams whose last step is failure, error, or cancelled** "
+            f"(min frequency {min_frequency}):"
+        )
+        lines.append("")
+        if not failure_top:
+            lines.append("_No failure-ending patterns met the frequency threshold._")
+            lines.append("")
+        else:
+            for rank, (chain, freq) in enumerate(failure_top, start=1):
+                lines.append(f"{rank}. `{_format_chain(chain)}` -- count **{freq}**")
+            lines.append("")
+
+    lines.append("---")
+    lines.append("")
+    lines.append(
+        "Draft only: edit before treating as policy. "
+        "Counts are over the whole file order (not split by session id)."
+    )
+    lines.append("")
 
     return "\n".join(lines)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Summarize frequent successful event sequences from trace JSONL into a markdown rulebook template."
+        description=(
+            "Summarize frequent event-name n-grams from trace JSONL into a markdown rulebook."
+        )
     )
     parser.add_argument(
         "--input",
         required=True,
         type=Path,
-        help="Path to exported trace JSONL (one JSON object per line).",
+        help="Path to trace JSONL (one JSON object per line).",
     )
     parser.add_argument(
         "--output",
@@ -237,16 +309,31 @@ def main() -> int:
         type=int,
         default=2,
         metavar="N",
-        help="Minimum times a subsequence must appear (default: 2).",
+        help="Minimum count for an n-gram to be listed (default: 2).",
+    )
+    parser.add_argument(
+        "--max-rules",
+        type=int,
+        default=50,
+        metavar="N",
+        help="Max items in the main pattern lists (default: 50).",
     )
     args = parser.parse_args()
     if args.min_frequency < 1:
         print("--min-frequency must be at least 1", file=sys.stderr)
         return 2
+    if args.max_rules < 1:
+        print("--max-rules must be at least 1", file=sys.stderr)
+        return 2
     if not args.input.is_file():
         print(f"Input not found: {args.input}", file=sys.stderr)
         return 1
-    md = generate_markdown(args.input, args.min_frequency, str(args.input.resolve()))
+    md = generate_markdown(
+        args.input,
+        args.min_frequency,
+        args.max_rules,
+        str(args.input.resolve()),
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(md, encoding="utf-8")
     print(f"Wrote {args.output} ({len(md)} bytes)")
