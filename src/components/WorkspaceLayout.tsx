@@ -387,17 +387,22 @@ export function WorkspaceLayout() {
     if (ok) alert('Also wrote CSV to exports/ on disk.');
   };
 
-  const replayLastSupportedActions = useCallback(async (opts?: { dryRun?: boolean }) => {
+  const replayLastSupportedActions = useCallback(async (opts?: { dryRun?: boolean; sessionOnly?: boolean }) => {
     const all = listAgentTraceEvents();
-    const recent = all.slice(-200);
+    const source = opts?.sessionOnly && getCurrentAgentTraceSessionId()
+      ? all.filter((e) => e.sessionId === getCurrentAgentTraceSessionId())
+      : all;
+    const recent = source.slice(-200);
     let runAiFailures = 0;
     const dryRun = opts?.dryRun === true;
+    const sessionOnly = opts?.sessionOnly === true;
     recordAgentTrace({
       event: dryRun ? 'trace_replay_dry_run_started' : 'trace_replay_started',
       category: 'action',
       result: 'neutral',
       context: {
         dryRun,
+        sessionOnly,
         sourceWindowSize: 200,
         sourceEventCount: recent.length,
       },
@@ -436,6 +441,7 @@ export function WorkspaceLayout() {
       result: failed > 0 || runAiFailures > 0 ? 'error' : 'success',
       context: {
         dryRun,
+        sessionOnly,
         sourceEventCount: recent.length,
         appliedCount: applied,
         skippedCount: skipped,
@@ -444,7 +450,8 @@ export function WorkspaceLayout() {
       },
     });
     const modePrefix = dryRun ? 'Replay dry-run' : 'Replay';
-    const msg = `${modePrefix}: ${res.outcomes.length} events, applied ${applied}, skipped ${skipped}, failed ${failed}${
+    const scopeSuffix = sessionOnly ? ' (session)' : '';
+    const msg = `${modePrefix}${scopeSuffix}: ${res.outcomes.length} events, applied ${applied}, skipped ${skipped}, failed ${failed}${
       runAiFailures ? `, run AI failures ${runAiFailures}` : ''
     }.`;
     if (recent.length === 0) {
@@ -592,6 +599,10 @@ export function WorkspaceLayout() {
               onAfterMutate={() => setTraceUiTick((n) => n + 1)}
               onReplay={() => void replayLastSupportedActions()}
               onReplayDryRun={() => void replayLastSupportedActions({ dryRun: true })}
+              onReplaySession={() => void replayLastSupportedActions({ sessionOnly: true })}
+              onReplaySessionDryRun={() =>
+                void replayLastSupportedActions({ dryRun: true, sessionOnly: true })
+              }
             />
           ) : null}
           <div className="min-h-0 flex-1 overflow-auto p-2">

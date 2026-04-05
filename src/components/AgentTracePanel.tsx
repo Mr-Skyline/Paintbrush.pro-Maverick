@@ -66,11 +66,15 @@ export function AgentTracePanel({
   onAfterMutate,
   onReplay,
   onReplayDryRun,
+  onReplaySession,
+  onReplaySessionDryRun,
 }: {
   refreshKey: number;
   onAfterMutate?: () => void;
   onReplay?: () => void;
   onReplayDryRun?: () => void;
+  onReplaySession?: () => void;
+  onReplaySessionDryRun?: () => void;
 }) {
   void refreshKey;
   const all = listAgentTraceEvents();
@@ -155,6 +159,30 @@ export function AgentTracePanel({
             }}
           >
             Replay dry-run
+          </button>
+        ) : null}
+        {onReplaySession ? (
+          <button
+            type="button"
+            className="rounded border border-ost-border px-1.5 py-0.5 hover:bg-white/10"
+            onClick={() => {
+              onReplaySession();
+              bump();
+            }}
+          >
+            Replay session
+          </button>
+        ) : null}
+        {onReplaySessionDryRun ? (
+          <button
+            type="button"
+            className="rounded border border-ost-border px-1.5 py-0.5 hover:bg-white/10"
+            onClick={() => {
+              onReplaySessionDryRun();
+              bump();
+            }}
+          >
+            Replay session dry-run
           </button>
         ) : null}
       </div>
