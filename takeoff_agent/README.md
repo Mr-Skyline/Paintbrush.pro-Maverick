@@ -61,4 +61,7 @@ The JSON contains:
 - Current detection is a robust baseline using OpenCV primitives and heuristics.
 - `ultralytics`/`paddleocr` are included in dependencies for incremental migration to trainable detectors/OCR-based scale detection.
 - YOLO integration is optional and activated when model paths are configured in `config.yaml`.
+- YOLO config supports both keys for compatibility:
+  - `model_path` (preferred)
+  - `wall_model_path` (legacy alias)
 - Error handling writes structured logs to `output/.../logs/errors.jsonl`.

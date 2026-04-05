@@ -175,7 +175,9 @@ def main() -> int:
     for page in pages:
         processed: dict[str, Any] | None = None
         try:
-            _, binary = denoise_and_threshold(page.image_bgr)
+            _, binary = denoise_and_threshold(
+                page.image_bgr, config.get("preprocess", {})
+            )
             raw = run_detection(
                 binary, detection_cfg, source_image=page.image_bgr, retry_index=0
             )
@@ -190,7 +192,9 @@ def main() -> int:
                     dsize=(new_w, new_h),
                     interpolation=cv2.INTER_AREA,
                 )
-                _, binary_retry = denoise_and_threshold(resized)
+                _, binary_retry = denoise_and_threshold(
+                    resized, config.get("preprocess", {})
+                )
                 raw_retry = run_detection(
                     binary_retry, detection_cfg, source_image=resized, retry_index=1
                 )

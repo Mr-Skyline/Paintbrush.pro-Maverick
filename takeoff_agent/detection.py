@@ -264,8 +264,13 @@ def run_detection(
     counts_cfg = config.get("counts", {})
 
     yolo_cfg = config.get("yolo", walls_cfg.get("yolo", {}))
-    yolo_model_path = str(yolo_cfg.get("wall_model_path", "")).strip()
-    yolo_conf = float(yolo_cfg.get("confidence", 0.25))
+    # Accept both old and new key names to avoid config drift.
+    yolo_model_path = str(
+        yolo_cfg.get("model_path") or yolo_cfg.get("wall_model_path") or ""
+    ).strip()
+    yolo_conf = float(
+        yolo_cfg.get("confidence_threshold", yolo_cfg.get("confidence", 0.25))
+    )
     prefer_yolo = bool(yolo_cfg.get("enabled", False))
 
     walls: list[dict[str, Any]] = []

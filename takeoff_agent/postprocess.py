@@ -124,6 +124,8 @@ def finalize_page_results(
     return {
         "page_index": page.page_index,
         "source_name": page.source_name,
+        "detection_source": getattr(raw_detection, "detection_source", "unknown"),
+        "retries_used": int(getattr(raw_detection, "retries_used", 0)),
         "scale": {
             "ft_per_px": page.scale_ft_per_px,
             "px_per_ft": round(px_per_foot, 4),
