@@ -1,0 +1,13 @@
+{
+  "project_name": "Paintbrush.pro",
+  "created_at_utc": "2026-04-05T01:08:25.030484+00:00",
+  "notes": "Fresh-start dataset scaffold. Add files manually or via uploader.",
+  "classes": [
+    "exterior_wall",
+    "interior_wall",
+    "door",
+    "window",
+    "fixture"
+  ],
+  "samples": []
+}
