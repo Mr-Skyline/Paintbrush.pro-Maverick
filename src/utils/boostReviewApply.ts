@@ -99,18 +99,87 @@ function ensureCondition(name: string, fallbackColor: string) {
   return cond;
 }
 
-/** Same as Review panel "Approve & draw all". */
-export function applyBoostReviewApproveAll(): {
+export type BoostReviewApplyMetrics = {
+  findingsBefore: number;
+  conditionsBefore: number;
+  conditionsAfter: number;
+  conditionsAdded: number;
+  canvasObjectCountBefore: number;
+  canvasObjectCountAfter: number;
+  canvasObjectsAdded: number;
+};
+
+export type ApplyBoostReviewApproveAllResult = {
   ok: boolean;
   error?: string;
   applied?: number;
+  metrics?: BoostReviewApplyMetrics;
+  /** @deprecated Prefer metrics.* — kept for backward compatibility with serialized tool results. */
   markersBefore?: number;
+  /** @deprecated Prefer metrics.* */
   markersAfter?: number;
+  /** @deprecated Prefer metrics.canvasObjectsAdded */
   appliedFindings?: number;
+  /** @deprecated Prefer metrics.conditionsAdded */
   conditionsAdded?: number;
+  /** @deprecated Prefer metrics.canvasObjectCountBefore */
   canvasObjectCountBefore?: number;
+  /** @deprecated Prefer metrics.canvasObjectCountAfter */
   canvasObjectCountAfter?: number;
-} {
+};
+
+function getTakeoffCanvas(): fabric.Canvas | null {
+  const c = (window as unknown as { __takeoffCanvas?: fabric.Canvas })
+    .__takeoffCanvas;
+  return c ?? null;
+}
+
+/**
+ * Pre-apply snapshot of store and canvas for the current Boost review.
+ * `conditionsAfter` / `canvasObjectCountAfter` match `*Before` and added counts are zero.
+ */
+export function previewBoostReviewMetrics():
+  | { ok: true; metrics: BoostReviewApplyMetrics }
+  | { ok: false; error: string } {
+  const st = useProjectStore.getState();
+  const review = st.boostReview;
+  if (!review) {
+    return {
+      ok: false,
+      error: 'No Boost review is open. Call boost_run first.',
+    };
+  }
+  const c = getTakeoffCanvas();
+  if (!c) {
+    return { ok: false, error: 'Canvas not ready.' };
+  }
+  const findingsBefore = review.findings.length;
+  const conditionsBefore = st.conditions.length;
+  const canvasObjectCountBefore = c.getObjects().length;
+  return {
+    ok: true,
+    metrics: {
+      findingsBefore,
+      conditionsBefore,
+      conditionsAfter: conditionsBefore,
+      conditionsAdded: 0,
+      canvasObjectCountBefore,
+      canvasObjectCountAfter: canvasObjectCountBefore,
+      canvasObjectsAdded: 0,
+    },
+  };
+}
+
+/** Clear Boost review state and close the review panel (no apply). */
+export function dismissBoostReview(): { ok: true } {
+  const st = useProjectStore.getState();
+  st.setBoostReview(null);
+  st.setReviewOpen(false);
+  return { ok: true };
+}
+
+/** Same as Review panel "Approve & draw all". */
+export function applyBoostReviewApproveAll(): ApplyBoostReviewApproveAllResult {
   const st = useProjectStore.getState();
   const review = st.boostReview;
   if (!review) {
@@ -134,10 +203,9 @@ export function applyBoostReviewApproveAll(): {
       error,
     };
   }
-  const findingsCount = review.findings.length;
+  const findingsBefore = review.findings.length;
   const suggestedConditionsCount = review.suggestedConditions.length;
-  const c = (window as unknown as { __takeoffCanvas?: fabric.Canvas })
-    .__takeoffCanvas;
+  const c = getTakeoffCanvas();
   if (!c) {
     const error = 'Canvas not ready.';
     recordAgentTrace({
@@ -145,8 +213,8 @@ export function applyBoostReviewApproveAll(): {
       category: 'review',
       result: 'failure',
       context: {
-        findingsCountBefore: findingsCount,
-        findingsCountAfter: findingsCount,
+        findingsCountBefore: findingsBefore,
+        findingsCountAfter: findingsBefore,
         suggestedConditionsCountBefore: suggestedConditionsCount,
         suggestedConditionsCountAfter: suggestedConditionsCount,
         appliedCount: 0,
@@ -156,10 +224,10 @@ export function applyBoostReviewApproveAll(): {
     });
     return { ok: false, error };
   }
+  const conditionsBefore = st.conditions.length;
   const canvasObjectCountBefore = c.getObjects().length;
   const markersBefore = countBoostMarkersOnCanvas(c);
   st.applyBoostConditions(review.suggestedConditions);
-  const conditionsAdded = review.suggestedConditions.length;
   for (const f of review.findings) {
     const cond = ensureCondition(
       f.conditionName,
@@ -174,6 +242,18 @@ export function applyBoostReviewApproveAll(): {
   const appliedFindings = countBoostMarkersOnCanvas(c) - markersBefore;
   const markersAfter = countBoostMarkersOnCanvas(c);
   const canvasObjectCountAfter = c.getObjects().length;
+  const conditionsAfter = useProjectStore.getState().conditions.length;
+  const conditionsAdded = conditionsAfter - conditionsBefore;
+  const canvasObjectsAdded = canvasObjectCountAfter - canvasObjectCountBefore;
+  const metrics: BoostReviewApplyMetrics = {
+    findingsBefore,
+    conditionsBefore,
+    conditionsAfter,
+    conditionsAdded,
+    canvasObjectCountBefore,
+    canvasObjectCountAfter,
+    canvasObjectsAdded,
+  };
   st.setBoostReview(null);
   st.setReviewOpen(false);
   const snap = (window as unknown as { __takeoffPushUndoSnapshot?: () => void })
@@ -184,24 +264,26 @@ export function applyBoostReviewApproveAll(): {
     category: 'review',
     result: 'success',
     context: {
-      findingsCountBefore: findingsCount,
+      findingsCountBefore: findingsBefore,
       findingsCountAfter: 0,
       suggestedConditionsCountBefore: suggestedConditionsCount,
       suggestedConditionsCountAfter: 0,
       appliedCount: appliedFindings,
       appliedFindings,
-      appliedFindingsAttempted: findingsCount,
+      appliedFindingsAttempted: findingsBefore,
       conditionsAdded,
       conditionsAddedAttempted: suggestedConditionsCount,
       canvasObjectCountBefore,
       canvasObjectCountAfter,
       markersBefore,
       markersAfter,
+      metrics,
     },
   });
   return {
     ok: true,
     applied: review.findings.length,
+    metrics,
     appliedFindings,
     conditionsAdded,
     canvasObjectCountBefore,
