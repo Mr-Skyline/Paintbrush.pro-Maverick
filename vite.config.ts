@@ -14,9 +14,6 @@ export default defineConfig({
           if (!id.includes('node_modules')) return;
           if (id.includes('pdfjs-dist')) return 'pdfjs';
           if (id.includes('fabric')) return 'fabric';
-          if (id.includes('react') || id.includes('scheduler')) return 'react-vendor';
-          if (id.includes('socket.io')) return 'socket-io';
-          return 'vendor';
         },
       },
     },
