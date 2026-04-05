@@ -19,7 +19,6 @@ from .runtime import (
     append_error_log,
     configure_logger,
     ensure_runtime_dirs,
-    log_exception,
     maybe_emit_supabase_handoff,
 )
 
@@ -196,7 +195,37 @@ def main() -> int:
                     binary_retry, detection_cfg, source_image=resized, retry_index=1
                 )
                 if raw_retry.confidence > raw.confidence:
-                    page.image_bgr = resized
+                    retry_scale_x = float(page.image_bgr.shape[1]) / float(new_w)
+                    retry_scale_y = float(page.image_bgr.shape[0]) / float(new_h)
+                    retry_scale = max(retry_scale_x, retry_scale_y)
+
+                    # Reproject retry detections back to original image coordinates
+                    # so quantity calculations remain on the original plan scale.
+                    for wall in raw_retry.walls:
+                        sx, sy = wall["start_px"]
+                        ex, ey = wall["end_px"]
+                        wall["start_px"] = [
+                            int(round(sx * retry_scale_x)),
+                            int(round(sy * retry_scale_y)),
+                        ]
+                        wall["end_px"] = [
+                            int(round(ex * retry_scale_x)),
+                            int(round(ey * retry_scale_y)),
+                        ]
+                        wall["length_px"] = float(wall["length_px"]) * retry_scale
+
+                    for room in raw_retry.rooms:
+                        room["polygon_px"] = [
+                            [
+                                int(round(pt[0] * retry_scale_x)),
+                                int(round(pt[1] * retry_scale_y)),
+                            ]
+                            for pt in room.get("polygon_px", [])
+                        ]
+                        room["area_px"] = float(room.get("area_px", 0.0)) * (
+                            retry_scale_x * retry_scale_y
+                        )
+
                     processed = finalize_page_results(page, raw_retry, config)
                     processed["retry_applied"] = True
                     logger.info(
