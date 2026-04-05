@@ -86,6 +86,30 @@ async function pickOutputDir() {
   return result.filePaths[0] || null;
 }
 
+async function pickTakeoffInputFile() {
+  const result = await dialog.showOpenDialog({
+    title: 'Select Blueprint (PDF/Image)',
+    properties: ['openFile'],
+    filters: [
+      {
+        name: 'Blueprint Files',
+        extensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff'],
+      },
+    ],
+  });
+  if (result.canceled) return null;
+  return result.filePaths[0] || null;
+}
+
+async function pickTakeoffOutputDir() {
+  const result = await dialog.showOpenDialog({
+    title: 'Select Takeoff Output Folder',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled) return null;
+  return result.filePaths[0] || null;
+}
+
 function runInvoiceReview(options) {
   const scriptPath = path.join(ROOT_DIR, 'scripts', 'review-invoices.mjs');
   const args = [scriptPath];
@@ -142,6 +166,82 @@ function runInvoiceReview(options) {
         exitCode: 1,
         stdout,
         stderr: `${stderr}\nSpawn error: ${error?.message || String(error)}`,
+      });
+    });
+  });
+}
+
+function runTakeoffAgent(options) {
+  const inputPath = String(options?.input || options?.inputPath || '').trim();
+  if (!inputPath) {
+    return Promise.resolve({
+      ok: false,
+      exitCode: 1,
+      stdout: '',
+      stderr: 'Missing blueprint input path.',
+      jsonPath: '',
+      csvPath: '',
+    });
+  }
+  const outDir =
+    String(options?.outDir || options?.outputDir || '').trim() ||
+    path.join(ROOT_DIR, 'output', 'desktop-takeoff');
+  const configPath = String(options?.configPath || '').trim();
+  const projectId = String(options?.projectId || '').trim() || `desktop-${Date.now()}`;
+  const saveOverlays = Boolean(options?.saveOverlays);
+  const saveDebugImages = Boolean(options?.saveDebugImages);
+  const enableSupabaseHandoff = Boolean(options?.enableSupabaseHandoff);
+  const pythonBin =
+    String(process.env.PYTHON_BIN || '').trim() ||
+    (process.platform === 'win32' ? 'python' : 'python3');
+
+  const args = [
+    '-m',
+    'takeoff_agent.main',
+    '--input',
+    inputPath,
+    '--out',
+    outDir,
+    '--project-id',
+    projectId,
+  ];
+  if (configPath) args.push('--config', configPath);
+  if (saveOverlays) args.push('--save-overlays');
+  if (saveDebugImages) args.push('--save-debug-images');
+  if (enableSupabaseHandoff) args.push('--enable-supabase-handoff');
+
+  return new Promise((resolve) => {
+    const child = spawn(pythonBin, args, {
+      cwd: ROOT_DIR,
+      windowsHide: true,
+      env: { ...process.env },
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on('close', (code) => {
+      resolve({
+        ok: code === 0,
+        exitCode: code ?? 1,
+        stdout,
+        stderr,
+        jsonPath: path.join(outDir, 'takeoff-results.json'),
+        csvPath: path.join(outDir, 'takeoff-results.csv'),
+      });
+    });
+    child.on('error', (error) => {
+      resolve({
+        ok: false,
+        exitCode: 1,
+        stdout,
+        stderr: `${stderr}\nSpawn error: ${error?.message || String(error)}`,
+        jsonPath: path.join(outDir, 'takeoff-results.json'),
+        csvPath: path.join(outDir, 'takeoff-results.csv'),
       });
     });
   });
@@ -286,6 +386,9 @@ ipcMain.handle('invoice:openPath', async (_event, targetPath) => {
   const error = await shell.openPath(target);
   return !error;
 });
+ipcMain.handle('takeoff:pickInput', pickTakeoffInputFile);
+ipcMain.handle('takeoff:pickOutput', pickTakeoffOutputDir);
+ipcMain.handle('takeoff:run', (_event, options) => runTakeoffAgent(options));
 
 app.whenReady().then(() => {
   createWindow();
