@@ -1,4 +1,5 @@
 import { useProjectStore } from '@/store/projectStore';
+import { recordAgentTrace } from '@/lib/agentTrace';
 import { applyBoostReviewApproveAll } from '@/utils/boostReviewApply';
 
 const FINDING_LABELS: Record<string, string> = {
@@ -21,8 +22,35 @@ export function ReviewPanel() {
   if (!review || !reviewOpen) return null;
 
   const approveAll = () => {
+    recordAgentTrace({
+      category: 'action',
+      event: 'review.approve_all.click',
+      reason: 'Operator approved all AI findings for this review batch.',
+      context: {
+        findings: review.findings.length,
+        suggestedConditions: review.suggestedConditions.length,
+      },
+    });
     const r = applyBoostReviewApproveAll();
-    if (!r.ok) alert(r.error ?? 'Could not apply Boost review.');
+    if (!r.ok) {
+      recordAgentTrace({
+        category: 'outcome',
+        event: 'review.approve_all.result',
+        result: 'error',
+        reason: r.error ?? 'Approve-all failed in Boost review.',
+      });
+      alert(r.error ?? 'Could not apply Boost review.');
+      return;
+    }
+    recordAgentTrace({
+      category: 'outcome',
+      event: 'review.approve_all.result',
+      result: 'success',
+      reason: 'Boost review findings were applied to canvas.',
+      context: {
+        applied: r.applied ?? review.findings.length,
+      },
+    });
   };
 
   return (
@@ -56,7 +84,24 @@ export function ReviewPanel() {
           <button
             type="button"
             onClick={() => {
+              recordAgentTrace({
+                category: 'action',
+                event: 'review.add_conditions_only.click',
+                reason:
+                  'Operator accepted suggested conditions without drawing all marks.',
+                context: {
+                  suggestedConditions: review.suggestedConditions.length,
+                },
+              });
               applyBoostConditions(review.suggestedConditions);
+              recordAgentTrace({
+                category: 'outcome',
+                event: 'review.add_conditions_only.result',
+                result: 'success',
+                context: {
+                  suggestedConditions: review.suggestedConditions.length,
+                },
+              });
             }}
             className="rounded-md border border-ost-border px-2.5 py-1.5 text-xs hover:bg-white/5"
           >
@@ -65,6 +110,14 @@ export function ReviewPanel() {
           <button
             type="button"
             onClick={() => {
+              recordAgentTrace({
+                category: 'action',
+                event: 'review.dismiss.click',
+                reason: 'Operator dismissed AI review without full apply.',
+                context: {
+                  findings: review.findings.length,
+                },
+              });
               setReview(null);
               setReviewOpen(false);
             }}

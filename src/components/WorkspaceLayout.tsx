@@ -13,6 +13,7 @@ import { exportCsvToFileSystem, syncProjectToFileSystem } from '@/lib/fsSync';
 import { saveProjectToIndexedDb } from '@/lib/projectPersistence';
 import { downloadProjectZip } from '@/lib/zipExport';
 import { downloadPaintbrushCsv } from '@/lib/paintbrushExport';
+import { downloadAgentTraceJsonl, recordAgentTrace } from '@/lib/agentTrace';
 import { setAgentHostHandlers } from '@/agent/agentHost';
 import { useNavigationStore } from '@/store/navigationStore';
 import { useProjectStore } from '@/store/projectStore';
@@ -149,6 +150,17 @@ export function WorkspaceLayout() {
       }
       setUploadingSheets(true);
       setGuideMessage({ tone: 'neutral', text: 'Uploading plans…' });
+      recordAgentTrace({
+        category: 'decision',
+        event: 'upload_plans_started',
+        reason: 'Ingest source plans into active takeoff project.',
+        result: 'neutral',
+        context: {
+          candidateFileCount: files.length,
+          acceptedPdfCount: pdfs.length,
+          projectId,
+        },
+      });
       try {
         let added = 0;
         for (const file of pdfs) {
@@ -160,12 +172,33 @@ export function WorkspaceLayout() {
           added += 1;
         }
         await saveProjectToIndexedDb();
+        recordAgentTrace({
+          category: 'outcome',
+          event: 'upload_plans_completed',
+          reason: 'Persist uploaded plans and update takeoff scope.',
+          result: 'success',
+          context: {
+            addedPlans: added,
+            totalPlans: useProjectStore.getState().documents.length,
+            projectId,
+          },
+        });
         setGuideMessage({
           tone: 'success',
           text: `Added ${added} plan${added === 1 ? '' : 's'}. Next: choose a sheet and run AI takeoff.`,
         });
       } catch (err) {
         console.error(err);
+        recordAgentTrace({
+          category: 'outcome',
+          event: 'upload_plans_completed',
+          reason: 'Persist uploaded plans and update takeoff scope.',
+          result: 'error',
+          context: {
+            projectId,
+            error: String(err),
+          },
+        });
         setGuideMessage({
           tone: 'error',
           text: `Could not add plans: ${String(err)}`,
@@ -184,8 +217,34 @@ export function WorkspaceLayout() {
     }
     setBoostRunning(true);
     setGuideMessage({ tone: 'neutral', text: 'Running AI takeoff on current sheet…' });
+    recordAgentTrace({
+      category: 'decision',
+      event: 'run_ai_takeoff_started',
+      reason: 'Execute AI takeoff inference on active sheet.',
+      result: 'neutral',
+      context: {
+        projectId,
+        currentPage,
+        totalPages,
+        totalPlans: documents.length,
+      },
+    });
     const result = await runBoost('page');
     if (result.ok) {
+      const latest = useProjectStore.getState().boostReview;
+      recordAgentTrace({
+        category: 'outcome',
+        event: 'run_ai_takeoff_completed',
+        reason: 'Capture AI findings for operator review.',
+        result: 'success',
+        context: {
+          projectId,
+          currentPage,
+          findings: latest?.findings.length ?? 0,
+          suggestedConditions: latest?.suggestedConditions.length ?? 0,
+          headline: result.headline ?? '',
+        },
+      });
       setGuideMessage({
         tone: 'success',
         text:
@@ -194,6 +253,17 @@ export function WorkspaceLayout() {
       });
       return;
     }
+    recordAgentTrace({
+      category: 'outcome',
+      event: 'run_ai_takeoff_completed',
+      reason: 'Capture AI findings for operator review.',
+      result: 'error',
+      context: {
+        projectId,
+        currentPage,
+        error: result.error ?? 'AI takeoff failed.',
+      },
+    });
     setGuideMessage({
       tone: 'error',
       text: result.error ?? 'AI takeoff failed.',
@@ -315,14 +385,35 @@ export function WorkspaceLayout() {
   const saveManual = async () => {
     try {
       await saveProjectToIndexedDb();
+      recordAgentTrace({
+        category: 'action',
+        event: 'save_project_manual',
+        reason: 'Persist project snapshot.',
+        result: 'success',
+        context: { projectId, totalPlans: documents.length },
+      });
       alert('Saved to browser storage.');
     } catch (e) {
+      recordAgentTrace({
+        category: 'action',
+        event: 'save_project_manual',
+        reason: 'Persist project snapshot.',
+        result: 'error',
+        context: { projectId, error: String(e) },
+      });
       alert(String(e));
     }
   };
 
   const syncDisk = async () => {
     const ok = await syncProjectToFileSystem();
+    recordAgentTrace({
+      category: 'action',
+      event: 'sync_project_to_disk',
+      reason: 'Mirror project state to linked workspace folder.',
+      result: ok ? 'success' : 'error',
+      context: { projectId },
+    });
     alert(
       ok
         ? 'Synced to linked workspace folder.'
@@ -333,6 +424,13 @@ export function WorkspaceLayout() {
   const exportPb = async () => {
     const rows = exportRows();
     downloadPaintbrushCsv(rows);
+    recordAgentTrace({
+      category: 'action',
+      event: 'export_paintbrush_csv',
+      reason: 'Create quantity export for downstream estimating.',
+      result: 'neutral',
+      context: { rowCount: rows.length, projectId },
+    });
     const ok = await exportCsvToFileSystem(rows, `takeoff-${Date.now()}.csv`);
     if (ok) alert('Also wrote CSV to exports/ on disk.');
   };
@@ -355,7 +453,30 @@ export function WorkspaceLayout() {
       ost,
       parts
     );
+    recordAgentTrace({
+      category: 'action',
+      event: 'download_project_zip',
+      reason: 'Export portable project package.',
+      result: 'success',
+      context: { projectId, pdfCount: parts.length },
+    });
   };
+
+  const exportTrace = useCallback(() => {
+    const result = downloadAgentTraceJsonl();
+    if (!result.ok) {
+      alert('Could not export trace log.');
+      return;
+    }
+    recordAgentTrace({
+      category: 'action',
+      event: 'export_agent_trace_jsonl',
+      reason: 'Capture structured decision trace for agent training.',
+      result: 'success',
+      context: { exportedEvents: result.count, projectId },
+    });
+    alert(`Exported ${result.count} trace events as JSONL.`);
+  }, [projectId]);
 
   return (
     <div
@@ -385,33 +506,76 @@ export function WorkspaceLayout() {
         onSyncDisk={syncDisk}
         onExportPaintbrush={exportPb}
         onDownloadZip={downloadZip}
+        onExportTrace={exportTrace}
       />
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ost-border bg-ost-panel/90 px-2 py-1 text-[11px]">
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
-            onClick={toggleLeft}
+            onClick={() => {
+              toggleLeft();
+              recordAgentTrace({
+                category: 'action',
+                event: 'toggle_plans_sidebar',
+                reason: 'Operator changed plans/conditions sidebar visibility.',
+                result: 'neutral',
+                context: { collapsedAfterToggle: !leftCollapsed },
+              });
+            }}
             className="rounded border border-ost-border px-1.5 py-0.5 text-ost-muted hover:bg-white/10"
           >
             {leftCollapsed ? 'Show plans panel' : 'Hide plans panel'}
           </button>
           <button
             type="button"
-            onClick={toggleRight}
+            onClick={() => {
+              toggleRight();
+              recordAgentTrace({
+                category: 'action',
+                event: 'toggle_inspector_sidebar',
+                reason: 'Operator changed mark inspector sidebar visibility.',
+                result: 'neutral',
+                context: { openAfterToggle: !rightOpen },
+              });
+            }}
             className="rounded border border-ost-border px-1.5 py-0.5 text-ost-muted hover:bg-white/10"
           >
             {rightOpen ? 'Hide inspector' : 'Show inspector'}
           </button>
           <button
             type="button"
-            onClick={() => setWorkflowOpen((v) => !v)}
+            onClick={() =>
+              setWorkflowOpen((v) => {
+                const next = !v;
+                recordAgentTrace({
+                  category: 'action',
+                  event: 'toggle_workflow_panel',
+                  reason: 'Operator changed guided workflow panel visibility.',
+                  result: 'neutral',
+                  context: { openAfterToggle: next },
+                });
+                return next;
+              })
+            }
             className="rounded border border-ost-border px-1.5 py-0.5 text-ost-muted hover:bg-white/10"
           >
             {workflowOpen ? 'Hide workflow' : 'Show workflow'}
           </button>
           <button
             type="button"
-            onClick={() => setVoiceOpen((v) => !v)}
+            onClick={() =>
+              setVoiceOpen((v) => {
+                const next = !v;
+                recordAgentTrace({
+                  category: 'action',
+                  event: 'toggle_voice_panel',
+                  reason: 'Operator changed voice panel visibility.',
+                  result: 'neutral',
+                  context: { openAfterToggle: next },
+                });
+                return next;
+              })
+            }
             className="rounded border border-ost-border px-1.5 py-0.5 text-ost-muted hover:bg-white/10"
           >
             {voiceOpen ? 'Hide voice' : 'Show voice'}
