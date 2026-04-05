@@ -1,3 +1,4 @@
+import { recordAgentTrace } from '@/lib/agentTrace';
 import { useProjectStore } from '@/store/projectStore';
 import type { BoostFinding } from '@/types';
 import {
@@ -105,22 +106,60 @@ export function applyBoostReviewApproveAll(): {
   applied?: number;
   markersBefore?: number;
   markersAfter?: number;
+  appliedFindings?: number;
+  conditionsAdded?: number;
+  canvasObjectCountBefore?: number;
+  canvasObjectCountAfter?: number;
 } {
   const st = useProjectStore.getState();
   const review = st.boostReview;
   if (!review) {
+    const error = 'No Boost review is open. Call boost_run first.';
+    recordAgentTrace({
+      event: 'review_approve_all',
+      category: 'review',
+      result: 'failure',
+      context: {
+        findingsCountBefore: 0,
+        findingsCountAfter: 0,
+        suggestedConditionsCountBefore: 0,
+        suggestedConditionsCountAfter: 0,
+        appliedCount: 0,
+        appliedFindings: 0,
+        error,
+      },
+    });
     return {
       ok: false,
-      error: 'No Boost review is open. Call boost_run first.',
+      error,
     };
   }
+  const findingsCount = review.findings.length;
+  const suggestedConditionsCount = review.suggestedConditions.length;
   const c = (window as unknown as { __takeoffCanvas?: fabric.Canvas })
     .__takeoffCanvas;
   if (!c) {
-    return { ok: false, error: 'Canvas not ready.' };
+    const error = 'Canvas not ready.';
+    recordAgentTrace({
+      event: 'review_approve_all',
+      category: 'review',
+      result: 'failure',
+      context: {
+        findingsCountBefore: findingsCount,
+        findingsCountAfter: findingsCount,
+        suggestedConditionsCountBefore: suggestedConditionsCount,
+        suggestedConditionsCountAfter: suggestedConditionsCount,
+        appliedCount: 0,
+        appliedFindings: 0,
+        error,
+      },
+    });
+    return { ok: false, error };
   }
+  const canvasObjectCountBefore = c.getObjects().length;
   const markersBefore = countBoostMarkersOnCanvas(c);
   st.applyBoostConditions(review.suggestedConditions);
+  const conditionsAdded = review.suggestedConditions.length;
   for (const f of review.findings) {
     const cond = ensureCondition(
       f.conditionName,
@@ -132,12 +171,42 @@ export function applyBoostReviewApproveAll(): {
     );
     if (cond) applyFinding(f, cond.id, cond.color);
   }
-  const applied = review.findings.length;
+  const appliedFindings = countBoostMarkersOnCanvas(c) - markersBefore;
   const markersAfter = countBoostMarkersOnCanvas(c);
+  const canvasObjectCountAfter = c.getObjects().length;
   st.setBoostReview(null);
   st.setReviewOpen(false);
   const snap = (window as unknown as { __takeoffPushUndoSnapshot?: () => void })
     .__takeoffPushUndoSnapshot;
   snap?.();
-  return { ok: true, applied, markersBefore, markersAfter };
+  recordAgentTrace({
+    event: 'review_approve_all',
+    category: 'review',
+    result: 'success',
+    context: {
+      findingsCountBefore: findingsCount,
+      findingsCountAfter: 0,
+      suggestedConditionsCountBefore: suggestedConditionsCount,
+      suggestedConditionsCountAfter: 0,
+      appliedCount: appliedFindings,
+      appliedFindings,
+      appliedFindingsAttempted: findingsCount,
+      conditionsAdded,
+      conditionsAddedAttempted: suggestedConditionsCount,
+      canvasObjectCountBefore,
+      canvasObjectCountAfter,
+      markersBefore,
+      markersAfter,
+    },
+  });
+  return {
+    ok: true,
+    applied: review.findings.length,
+    appliedFindings,
+    conditionsAdded,
+    canvasObjectCountBefore,
+    canvasObjectCountAfter,
+    markersBefore,
+    markersAfter,
+  };
 }

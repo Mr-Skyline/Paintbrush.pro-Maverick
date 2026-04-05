@@ -16,17 +16,6 @@ export function ReviewPanel() {
 
   const approveAll = () => {
     const r = applyBoostReviewApproveAll();
-    recordAgentTrace('outcome', 'review_approve_all', {
-      result: r.ok ? 'ok' : 'error',
-      context: {
-        findingsCount,
-        suggestedConditionsCount,
-        applied: r.applied,
-        markersBefore: r.markersBefore,
-        markersAfter: r.markersAfter,
-        ...(r.error ? { error: r.error } : {}),
-      },
-    });
     if (!r.ok) alert(r.error ?? 'Could not apply Boost review.');
   };
 
@@ -50,11 +39,27 @@ export function ReviewPanel() {
           <button
             type="button"
             onClick={() => {
-              recordAgentTrace('decision', 'review_add_conditions_only', {
-                result: 'ok',
-                context: { findingsCount, suggestedConditionsCount },
-              });
+              const conditionsCountBefore =
+                useProjectStore.getState().conditions.length;
               applyBoostConditions(review.suggestedConditions);
+              const conditionsCountAfter =
+                useProjectStore.getState().conditions.length;
+              const conditionsDelta = conditionsCountAfter - conditionsCountBefore;
+              recordAgentTrace({
+                event: 'review_add_conditions_only',
+                category: 'review',
+                result: 'success',
+                context: {
+                  findingsCountBefore: findingsCount,
+                  findingsCountAfter: findingsCount,
+                  suggestedConditionsCountBefore: suggestedConditionsCount,
+                  suggestedConditionsCountAfter: suggestedConditionsCount,
+                  conditionsCountBefore,
+                  conditionsCountAfter,
+                  conditionsDelta,
+                  appliedCount: conditionsDelta,
+                },
+              });
             }}
             className="rounded-lg border border-ost-border px-3 py-2 text-sm hover:bg-white/5"
           >
@@ -63,9 +68,17 @@ export function ReviewPanel() {
           <button
             type="button"
             onClick={() => {
-              recordAgentTrace('decision', 'review_dismiss', {
-                result: 'ok',
-                context: { findingsCount, suggestedConditionsCount },
+              recordAgentTrace({
+                event: 'review_dismiss',
+                category: 'review',
+                result: 'success',
+                context: {
+                  findingsCountBefore: findingsCount,
+                  suggestedConditionsCountBefore: suggestedConditionsCount,
+                  findingsCountAfter: 0,
+                  suggestedConditionsCountAfter: 0,
+                  appliedCount: 0,
+                },
               });
               setReview(null);
               setReviewOpen(false);
