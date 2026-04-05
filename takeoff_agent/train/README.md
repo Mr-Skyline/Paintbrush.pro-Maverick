@@ -65,8 +65,6 @@ python -m takeoff_agent.train.cli ingest-pdf-folder \
 Optional watch controls:
 
 - `--watch-max-runs 120` stop after N scan cycles (0 = run forever)
-- `--watch-sleep-when-idle-seconds 120` longer sleep when no changes were processed
-- `--watch-summary-out /workspace/output/ingest-watch/latest.json` write loop summary JSON
 
 ### Upload fresh images to Roboflow
 
