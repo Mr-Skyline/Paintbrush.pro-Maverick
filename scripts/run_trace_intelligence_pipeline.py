@@ -117,7 +117,7 @@ def main() -> int:
     replay_path = out_dir / "trace_replay_plan.json"
     summary_path = out_dir / "pipeline_summary.json"
 
-    common: list[str] = [
+    rulebook_common: list[str] = [
         "--input",
         str(args.input.resolve()),
         "--min-frequency",
@@ -125,24 +125,30 @@ def main() -> int:
         "--max-rules",
         str(args.max_rules),
     ]
+    replay_common: list[str] = [
+        "--input",
+        str(args.input.resolve()),
+    ]
     if args.session_id is not None:
-        common.extend(["--session-id", args.session_id])
+        rulebook_common.extend(["--session-id", args.session_id])
+        replay_common.extend(["--session-only", args.session_id])
     if args.include_events is not None:
-        common.extend(["--include-events", args.include_events])
+        rulebook_common.extend(["--include-events", args.include_events])
+        replay_common.extend(["--include-events", args.include_events])
     if args.exclude_events is not None:
-        common.extend(["--exclude-events", args.exclude_events])
+        rulebook_common.extend(["--exclude-events", args.exclude_events])
 
     rulebook_argv = [
         py,
         str(rulebook_script),
-        *common,
+        *rulebook_common,
         "--output",
         str(rulebook_path.resolve()),
     ]
     replay_argv = [
         py,
         str(replay_script),
-        *common,
+        *replay_common,
         "--max-steps",
         str(args.max_steps),
         "--output",
