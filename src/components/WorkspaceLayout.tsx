@@ -391,6 +391,15 @@ export function WorkspaceLayout() {
     const all = listAgentTraceEvents();
     const recent = all.slice(-200);
     let runAiFailures = 0;
+    recordAgentTrace({
+      event: 'trace_replay_started',
+      category: 'action',
+      result: 'neutral',
+      context: {
+        sourceWindowSize: 200,
+        sourceEventCount: recent.length,
+      },
+    });
 
     const res = await replayAgentTraceEvents(recent, {
       set_tool: async ({ tool: t }) => {
@@ -421,6 +430,18 @@ export function WorkspaceLayout() {
     const applied = res.outcomes.filter((o) => o.outcome === 'applied').length;
     const skipped = res.outcomes.filter((o) => o.outcome === 'skipped').length;
     const failed = res.outcomes.filter((o) => o.outcome === 'failed').length;
+    recordAgentTrace({
+      event: 'trace_replay_completed',
+      category: 'outcome',
+      result: failed > 0 || runAiFailures > 0 ? 'error' : 'success',
+      context: {
+        sourceEventCount: recent.length,
+        appliedCount: applied,
+        skippedCount: skipped,
+        failedCount: failed,
+        runAiFailures,
+      },
+    });
     const msg = `Replay: ${res.outcomes.length} events, applied ${applied}, skipped ${skipped}, failed ${failed}${
       runAiFailures ? `, run AI failures ${runAiFailures}` : ''
     }.`;

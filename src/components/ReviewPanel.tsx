@@ -69,7 +69,7 @@ export function ReviewPanel() {
             type="button"
             onClick={() => {
               recordAgentTrace({
-                event: 'review_dismiss',
+                event: 'dismiss_review',
                 category: 'decision',
                 result: 'success',
                 context: {

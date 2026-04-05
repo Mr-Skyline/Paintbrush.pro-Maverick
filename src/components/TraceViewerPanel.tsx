@@ -1,6 +1,6 @@
 export type TraceViewerEvent = {
   id: string;
-  ts: string;
+  ts: string | number;
   category: string;
   event: string;
   result?: string;
@@ -31,9 +31,9 @@ function normalizeResultBucket(result: string | undefined): 'success' | 'error' 
   return 'neutral';
 }
 
-function formatTime(ts: string): string {
+function formatTime(ts: string | number): string {
   const d = new Date(ts);
-  if (Number.isNaN(d.getTime())) return ts;
+  if (Number.isNaN(d.getTime())) return String(ts);
   return d.toLocaleTimeString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
