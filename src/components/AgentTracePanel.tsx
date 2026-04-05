@@ -1,7 +1,7 @@
 import {
   clearAgentTraceEvents,
   downloadAgentTraceJsonl,
-  getAgentTraceViewerSnapshot,
+  listAgentTraceEvents,
   type AgentTraceEvent,
 } from '@/lib/agentTrace';
 
@@ -31,12 +31,24 @@ function contextSnippet(ctx: Record<string, unknown> | undefined, maxLen = 140):
 export function AgentTracePanel({
   refreshKey,
   onAfterMutate,
+  onReplay,
 }: {
   refreshKey: number;
   onAfterMutate?: () => void;
+  onReplay?: () => void;
 }) {
   void refreshKey;
-  const { total, byAxis, recent } = getAgentTraceViewerSnapshot(20);
+  const all = listAgentTraceEvents();
+  const total = all.length;
+  const byCategory: Record<string, number> = {};
+  for (const e of all) {
+    byCategory[e.category] = (byCategory[e.category] ?? 0) + 1;
+  }
+  const topCategories = Object.entries(byCategory)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 6);
+  const recent = [...all].reverse().slice(0, 20);
 
   const bump = () => onAfterMutate?.();
 
@@ -71,18 +83,29 @@ export function AgentTracePanel({
         >
           Clear
         </button>
+        {onReplay ? (
+          <button
+            type="button"
+            className="rounded border border-ost-border px-1.5 py-0.5 hover:bg-white/10"
+            onClick={() => {
+              onReplay();
+              bump();
+            }}
+          >
+            Replay
+          </button>
+        ) : null}
       </div>
       <div className="mb-1 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px]">
-        <span>
-          action: <span className="text-ost-fg">{byAxis.action}</span>
-        </span>
-        <span>
-          decision: <span className="text-ost-fg">{byAxis.decision}</span>
-        </span>
-        <span>
-          outcome: <span className="text-ost-fg">{byAxis.outcome}</span>
-        </span>
-        <span className="text-ost-muted/80">(axis · all events)</span>
+        {topCategories.length === 0 ? (
+          <span>No category counts</span>
+        ) : (
+          topCategories.map(([cat, n]) => (
+            <span key={cat}>
+              {cat}: <span className="text-ost-fg">{n}</span>
+            </span>
+          ))
+        )}
       </div>
       <ul className="max-h-[11rem] space-y-1 overflow-y-auto font-mono text-[10px] leading-tight">
         {recent.length === 0 ? (
@@ -92,7 +115,7 @@ export function AgentTracePanel({
             <li key={ev.id} className="border-b border-ost-border/40 pb-1 last:border-0">
               <div className="text-ost-fg">
                 {fmtTime(ev.ts)} · <span className="text-slate-300">{ev.event}</span> ·{' '}
-                {ev.result}
+                {ev.result ?? '—'}
               </div>
               <div className="mt-0.5 break-all text-[9px] text-ost-muted/90">
                 {contextSnippet(ev.context)}

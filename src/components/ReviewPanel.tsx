@@ -47,7 +47,7 @@ export function ReviewPanel() {
               const conditionsDelta = conditionsCountAfter - conditionsCountBefore;
               recordAgentTrace({
                 event: 'review_add_conditions_only',
-                category: 'review',
+                category: 'decision',
                 result: 'success',
                 context: {
                   findingsCountBefore: findingsCount,
@@ -70,7 +70,7 @@ export function ReviewPanel() {
             onClick={() => {
               recordAgentTrace({
                 event: 'review_dismiss',
-                category: 'review',
+                category: 'decision',
                 result: 'success',
                 context: {
                   findingsCountBefore: findingsCount,

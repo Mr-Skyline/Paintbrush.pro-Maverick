@@ -15,9 +15,19 @@ import { saveProjectToIndexedDb } from '@/lib/projectPersistence';
 import { downloadProjectZip } from '@/lib/zipExport';
 import { downloadPaintbrushCsv } from '@/lib/paintbrushExport';
 import { setAgentHostHandlers } from '@/agent/agentHost';
-import { downloadAgentTraceJsonl, recordAgentTrace } from '@/lib/agentTrace';
+import {
+  downloadAgentTraceJsonl,
+  endAgentTraceSession,
+  getCurrentAgentTraceSessionId,
+  listAgentTraceEvents,
+  recordAgentTrace,
+  startAgentTraceSession,
+} from '@/lib/agentTrace';
+import { replayAgentTraceEvents } from '@/lib/agentReplay';
 import { useNavigationStore } from '@/store/navigationStore';
 import { useProjectStore } from '@/store/projectStore';
+import type { TakeoffTool } from '@/types';
+import { applyBoostReviewApproveAll } from '@/utils/boostReviewApply';
 import { getAiFocusBoundingRectPx } from '@/utils/aiFocusContext';
 import { runTakeoffBoostOnPage } from '@/utils/takeoffBoost';
 import { findSimilarMarks } from '@/utils/findSimilar';
@@ -25,6 +35,23 @@ import type { ExportRow } from '@/utils/exportTakeoff';
 import { fabric } from 'fabric';
 import { openPdfFromArrayBuffer } from '@/utils/openPdfFromArrayBuffer';
 import { useCallback, useEffect, useState } from 'react';
+
+const TAKEOFF_TOOLS: TakeoffTool[] = [
+  'select',
+  'pan',
+  'ai_scope',
+  'line',
+  'polyline',
+  'polygon',
+  'arc',
+  'count',
+  'measure',
+  'text',
+];
+
+function isTakeoffTool(x: unknown): x is TakeoffTool {
+  return typeof x === 'string' && (TAKEOFF_TOOLS as string[]).includes(x);
+}
 
 type BoostRunResult = { ok: boolean; error?: string; headline?: string };
 
@@ -44,35 +71,28 @@ export function WorkspaceLayout() {
   const totalPages = useProjectStore((s) => s.totalPages);
   const projectId = useProjectStore((s) => s.projectId);
   const documents = useProjectStore((s) => s.documents);
+  const tool = useProjectStore((s) => s.tool);
 
   useAutoSave(!!projectId);
 
   useEffect(() => {
     const st0 = useProjectStore.getState();
-    recordAgentTrace({
-      event: 'session_started',
-      category: 'session',
-      result: 'success',
-      context: {
-        projectId: st0.projectId ?? null,
-        activeDocumentId: st0.activeDocumentId ?? null,
-        currentPage: st0.currentPage,
-        totalPages: st0.totalPages ?? 0,
-      },
+    startAgentTraceSession({
+      projectId: st0.projectId ?? null,
+      activeDocumentId: st0.activeDocumentId ?? null,
+      currentPage: st0.currentPage,
+      totalPages: st0.totalPages ?? 0,
     });
     return () => {
+      const sid = getCurrentAgentTraceSessionId();
       const st = useProjectStore.getState();
-      recordAgentTrace({
-        event: 'session_ended',
-        category: 'session',
-        result: 'success',
-        context: {
-          projectId: st.projectId ?? null,
-          activeDocumentId: st.activeDocumentId ?? null,
-          currentPage: st.currentPage,
-          totalPages: st.totalPages ?? 0,
-        },
-      });
+      const meta = {
+        projectId: st.projectId ?? null,
+        activeDocumentId: st.activeDocumentId ?? null,
+        currentPage: st.currentPage,
+        totalPages: st.totalPages ?? 0,
+      };
+      if (sid) endAgentTraceSession(sid, meta);
     };
   }, []);
 
@@ -90,19 +110,42 @@ export function WorkspaceLayout() {
     };
   }, [openProjectId, activeDocumentId]);
 
+  useEffect(() => {
+    if (!activeDocumentId || !totalPages) return;
+    recordAgentTrace({
+      event: 'sheet_selected',
+      category: 'action',
+      result: 'success',
+      context: {
+        documentId: activeDocumentId,
+        page: currentPage,
+        totalPages,
+      },
+    });
+  }, [activeDocumentId, currentPage, totalPages]);
+
+  useEffect(() => {
+    recordAgentTrace({
+      event: 'tool_selected',
+      category: 'action',
+      result: 'success',
+      context: { tool },
+    });
+  }, [tool]);
+
   const runBoost = useCallback(
     async (scope: 'page' | 'all'): Promise<BoostRunResult> => {
       recordAgentTrace({
         event: 'run_ai_takeoff_started',
-        category: 'ai',
-        result: 'pending',
+        category: 'action',
+        result: 'neutral',
         context: { scope },
       });
       if (!pdfData) {
         recordAgentTrace({
           event: 'run_ai_takeoff_ended',
-          category: 'ai',
-          result: 'failure',
+          category: 'outcome',
+          result: 'error',
           context: { scope, error: 'No PDF loaded for this sheet.' },
         });
         return { ok: false, error: 'No PDF loaded for this sheet.' };
@@ -127,7 +170,7 @@ export function WorkspaceLayout() {
           setBoostReview(review);
           recordAgentTrace({
             event: 'run_ai_takeoff_ended',
-            category: 'ai',
+            category: 'outcome',
             result: 'success',
             context: { scope, headline: review.headline },
           });
@@ -146,7 +189,7 @@ export function WorkspaceLayout() {
         setBoostReview(review);
         recordAgentTrace({
           event: 'run_ai_takeoff_ended',
-          category: 'ai',
+          category: 'outcome',
           result: 'success',
           context: { scope, headline: review.headline },
         });
@@ -154,8 +197,8 @@ export function WorkspaceLayout() {
       } catch (e) {
         recordAgentTrace({
           event: 'run_ai_takeoff_ended',
-          category: 'ai',
-          result: 'failure',
+          category: 'outcome',
+          result: 'error',
           context: { scope, error: String(e) },
         });
         return { ok: false, error: String(e) };
@@ -191,16 +234,16 @@ export function WorkspaceLayout() {
   const findSimilar = () => {
     recordAgentTrace({
       event: 'workspace_find_similar_invoked',
-      category: 'tool',
-      result: 'pending',
+      category: 'action',
+      result: 'neutral',
     });
     const c = (window as unknown as { __takeoffCanvas?: fabric.Canvas })
       .__takeoffCanvas;
     if (!c) {
       recordAgentTrace({
         event: 'workspace_find_similar_result',
-        category: 'tool',
-        result: 'failure',
+        category: 'outcome',
+        result: 'error',
         context: { reason: 'no_canvas' },
       });
       return;
@@ -209,8 +252,8 @@ export function WorkspaceLayout() {
     if (!a) {
       recordAgentTrace({
         event: 'workspace_find_similar_result',
-        category: 'tool',
-        result: 'skipped',
+        category: 'outcome',
+        result: 'neutral',
         context: { reason: 'no_selection' },
       });
       alert('Select a mark first.');
@@ -220,8 +263,8 @@ export function WorkspaceLayout() {
     if (!sim.length) {
       recordAgentTrace({
         event: 'workspace_find_similar_result',
-        category: 'tool',
-        result: 'skipped',
+        category: 'outcome',
+        result: 'neutral',
         context: { reason: 'no_matches' },
       });
       alert('No similar marks found.');
@@ -241,7 +284,7 @@ export function WorkspaceLayout() {
     }
     recordAgentTrace({
       event: 'workspace_find_similar_result',
-      category: 'tool',
+      category: 'outcome',
       result: 'success',
       context: { selectedCount: sel.length },
     });
@@ -254,8 +297,8 @@ export function WorkspaceLayout() {
     if (!f || !/\.pdf$/i.test(f.name) || !projectId) return;
     recordAgentTrace({
       event: 'workspace_pdf_upload_started',
-      category: 'data',
-      result: 'pending',
+      category: 'action',
+      result: 'neutral',
       context: { fileName: f.name },
     });
     try {
@@ -269,7 +312,7 @@ export function WorkspaceLayout() {
       await saveProjectToIndexedDb();
       recordAgentTrace({
         event: 'workspace_pdf_upload_completed',
-        category: 'data',
+        category: 'outcome',
         result: 'success',
         context: { fileName: f.name, documentId: docId, numPages: doc.numPages },
       });
@@ -277,8 +320,8 @@ export function WorkspaceLayout() {
       console.error(err);
       recordAgentTrace({
         event: 'workspace_pdf_upload_failed',
-        category: 'data',
-        result: 'failure',
+        category: 'outcome',
+        result: 'error',
         context: { fileName: f.name, error: String(err) },
       });
       alert('Could not add PDF.');
@@ -290,15 +333,15 @@ export function WorkspaceLayout() {
       await saveProjectToIndexedDb();
       recordAgentTrace({
         event: 'workspace_save_manual',
-        category: 'data',
+        category: 'outcome',
         result: 'success',
       });
       alert('Saved to browser storage.');
     } catch (e) {
       recordAgentTrace({
         event: 'workspace_save_manual',
-        category: 'data',
-        result: 'failure',
+        category: 'outcome',
+        result: 'error',
         context: { error: String(e) },
       });
       alert(String(e));
@@ -309,8 +352,8 @@ export function WorkspaceLayout() {
     const ok = await syncProjectToFileSystem();
     recordAgentTrace({
       event: 'workspace_sync_disk',
-      category: 'export',
-      result: ok ? 'success' : 'failure',
+      category: 'action',
+      result: ok ? 'success' : 'error',
       context: { ok },
     });
     alert(
@@ -323,41 +366,85 @@ export function WorkspaceLayout() {
   const exportPb = async () => {
     recordAgentTrace({
       event: 'workspace_export_paintbrush',
-      category: 'export',
-      result: 'pending',
+      category: 'action',
+      result: 'neutral',
     });
     const rows = exportRows();
     downloadPaintbrushCsv(rows);
     const ok = await exportCsvToFileSystem(rows, `takeoff-${Date.now()}.csv`);
     recordAgentTrace({
       event: 'workspace_export_paintbrush',
-      category: 'export',
+      category: 'outcome',
       result: 'success',
       context: { rowCount: rows.length, wroteToDisk: ok },
     });
     recordAgentTrace({
       event: 'export_paintbrush_csv',
-      category: 'export',
+      category: 'action',
       result: 'success',
       context: { rowCount: rows.length, wroteToDisk: ok },
     });
     if (ok) alert('Also wrote CSV to exports/ on disk.');
   };
 
+  const replayLastSupportedActions = useCallback(async () => {
+    const all = listAgentTraceEvents();
+    const recent = all.slice(-200);
+    let runAiFailures = 0;
+
+    const res = await replayAgentTraceEvents(recent, {
+      set_tool: async ({ tool: t }) => {
+        if (!isTakeoffTool(t)) return;
+        useProjectStore.getState().setTool(t);
+      },
+      set_page: async ({ documentId, page }) => {
+        const st = useProjectStore.getState();
+        if (!st.documents.some((d) => d.id === documentId)) return;
+        st.setActiveDocument(documentId);
+        if (page !== undefined) st.setPage(page);
+      },
+      run_ai_takeoff: async ({ context: ctx }) => {
+        const scope = ctx?.scope;
+        if (scope !== 'page' && scope !== 'all') return;
+        const r = await runBoost(scope);
+        if (!r.ok) runAiFailures += 1;
+      },
+      approve_review: async () => {
+        applyBoostReviewApproveAll();
+      },
+      export_outputs: async () => {
+        await exportPb();
+      },
+    });
+
+    setTraceUiTick((n) => n + 1);
+    const applied = res.outcomes.filter((o) => o.outcome === 'applied').length;
+    const skipped = res.outcomes.filter((o) => o.outcome === 'skipped').length;
+    const failed = res.outcomes.filter((o) => o.outcome === 'failed').length;
+    const msg = `Replay: ${res.outcomes.length} events, applied ${applied}, skipped ${skipped}, failed ${failed}${
+      runAiFailures ? `, run AI failures ${runAiFailures}` : ''
+    }.`;
+    if (recent.length === 0) {
+      alert('No events in recent trace window.');
+    } else {
+      alert(msg);
+    }
+  }, [runBoost, exportPb]);
+
   const downloadZip = async () => {
     if (!projectId) {
       recordAgentTrace({
         event: 'workspace_download_zip',
-        category: 'export',
-        result: 'skipped',
+        category: 'outcome',
+        result: 'neutral',
         context: { reason: 'no_project' },
       });
       return;
     }
     recordAgentTrace({
       event: 'workspace_download_zip_started',
-      category: 'export',
-      result: 'pending',
+      category: 'action',
+      result: 'neutral',
       context: { projectId },
     });
     try {
@@ -374,15 +461,15 @@ export function WorkspaceLayout() {
       await downloadProjectZip(projectId, ost.projectName, ost, parts);
       recordAgentTrace({
         event: 'workspace_download_zip',
-        category: 'export',
+        category: 'outcome',
         result: 'success',
         context: { pdfParts: parts.length },
       });
     } catch (e) {
       recordAgentTrace({
         event: 'workspace_download_zip',
-        category: 'export',
-        result: 'failure',
+        category: 'outcome',
+        result: 'error',
         context: { error: String(e) },
       });
       throw e;
@@ -392,7 +479,7 @@ export function WorkspaceLayout() {
   const goPage = (next: number, direction: 'prev' | 'next') => {
     recordAgentTrace({
       event: 'workspace_page_nav',
-      category: 'navigation',
+      category: 'action',
       result: 'success',
       context: { direction, from: currentPage, to: next },
     });
@@ -480,6 +567,7 @@ export function WorkspaceLayout() {
             <AgentTracePanel
               refreshKey={traceUiTick}
               onAfterMutate={() => setTraceUiTick((n) => n + 1)}
+              onReplay={() => void replayLastSupportedActions()}
             />
           ) : null}
           <div className="min-h-0 flex-1 overflow-auto p-2">

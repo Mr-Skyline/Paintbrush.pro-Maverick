@@ -186,8 +186,8 @@ export function applyBoostReviewApproveAll(): ApplyBoostReviewApproveAllResult {
     const error = 'No Boost review is open. Call boost_run first.';
     recordAgentTrace({
       event: 'review_approve_all',
-      category: 'review',
-      result: 'failure',
+      category: 'decision',
+      result: 'error',
       context: {
         findingsCountBefore: 0,
         findingsCountAfter: 0,
@@ -210,8 +210,8 @@ export function applyBoostReviewApproveAll(): ApplyBoostReviewApproveAllResult {
     const error = 'Canvas not ready.';
     recordAgentTrace({
       event: 'review_approve_all',
-      category: 'review',
-      result: 'failure',
+      category: 'decision',
+      result: 'error',
       context: {
         findingsCountBefore: findingsBefore,
         findingsCountAfter: findingsBefore,
@@ -259,10 +259,10 @@ export function applyBoostReviewApproveAll(): ApplyBoostReviewApproveAllResult {
   const snap = (window as unknown as { __takeoffPushUndoSnapshot?: () => void })
     .__takeoffPushUndoSnapshot;
   snap?.();
-  recordAgentTrace({
-    event: 'review_approve_all',
-    category: 'review',
-    result: 'success',
+    recordAgentTrace({
+      event: 'review_approve_all',
+      category: 'decision',
+      result: 'success',
     context: {
       findingsCountBefore: findingsBefore,
       findingsCountAfter: 0,
