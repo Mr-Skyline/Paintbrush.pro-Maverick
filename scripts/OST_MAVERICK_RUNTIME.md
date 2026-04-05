@@ -86,6 +86,16 @@ python "scripts\ost_orchestrator.py" maverick-daily-report-all --top 5
 python "scripts\ost_orchestrator.py" maverick-log-step --project "TP-0001" --action "boost_run_click" --outcome failure --archetype "boost-run-click" --expected "Run button clicked" --observed "Button not detected" --error "visual anchor mismatch"
 ```
 
+## Left-blank attempt bridge
+
+```powershell
+python "scripts\ost_left_blank_maverick_bridge.py" --project "TP-0001"
+```
+
+Reads the latest `left_blank_takeoff_attempt.json` under `output/ost-condition-takeoff/`
+and logs stable left-blank gate outcomes into Maverick so blockers/failure trends can
+reference the same artifacts.
+
 ## Guided click recording (after coach-mode)
 
 ```powershell
