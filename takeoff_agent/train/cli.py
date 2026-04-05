@@ -8,6 +8,7 @@ from .eval import evaluate_runs_root
 from .fresh_start import initialize_fresh_dataset
 from .dataset_ops import generate_yolo_data_yaml
 from .roboflow_client import upload_images
+from .train_jobs import promote_model_weights, run_yolo_training_job
 
 
 def parse_args() -> argparse.Namespace:
@@ -112,6 +113,89 @@ def parse_args() -> argparse.Namespace:
         help="Confidence threshold used for bad-run classification in the report.",
     )
 
+    train_cmd = sub.add_parser(
+        "train-yolo-walls",
+        help="Run a YOLO wall-detection training job.",
+    )
+    train_cmd.add_argument(
+        "--data-yaml",
+        default="takeoff_agent/train/datasets/fresh_start/data.yaml",
+        help="Path to YOLO data.yaml.",
+    )
+    train_cmd.add_argument(
+        "--model",
+        default="yolov8n.pt",
+        help="Base model to fine-tune.",
+    )
+    train_cmd.add_argument(
+        "--epochs",
+        type=int,
+        default=25,
+        help="Training epochs.",
+    )
+    train_cmd.add_argument(
+        "--imgsz",
+        type=int,
+        default=640,
+        help="Training image size.",
+    )
+    train_cmd.add_argument(
+        "--batch",
+        type=int,
+        default=8,
+        help="Batch size.",
+    )
+    train_cmd.add_argument(
+        "--device",
+        default="cpu",
+        help="Ultralytics device string (cpu, 0, 0,1...).",
+    )
+    train_cmd.add_argument(
+        "--project-dir",
+        default="takeoff_agent/train/runs",
+        help="Directory for training run artifacts.",
+    )
+    train_cmd.add_argument(
+        "--run-name",
+        default="walls_latest",
+        help="Training run name.",
+    )
+    train_cmd.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Create metadata without executing training.",
+    )
+
+    promote_cmd = sub.add_parser(
+        "promote-model",
+        help="Promote trained YOLO weights and patch takeoff config.",
+    )
+    promote_cmd.add_argument(
+        "--weights",
+        required=True,
+        help="Path to trained weights file (e.g., best.pt).",
+    )
+    promote_cmd.add_argument(
+        "--target-dir",
+        default="takeoff_agent/models",
+        help="Destination model directory in repo.",
+    )
+    promote_cmd.add_argument(
+        "--config-path",
+        default="takeoff_agent/config.yaml",
+        help="takeoff_agent config.yaml path to update.",
+    )
+    promote_cmd.add_argument(
+        "--model-key",
+        default="walls_latest.pt",
+        help="Filename to use inside target-dir.",
+    )
+    promote_cmd.add_argument(
+        "--enable-yolo",
+        action="store_true",
+        help="Enable yolo.enabled=true in config after promotion.",
+    )
+
     return parser.parse_args()
 
 
@@ -163,6 +247,32 @@ def main() -> int:
             runs_root=Path(args.runs_root).resolve(),
             out_dir=Path(args.out_dir).resolve(),
             min_confidence=float(args.min_confidence),
+        )
+        print(json.dumps(summary, indent=2))
+        return 0
+
+    if args.command == "train-yolo-walls":
+        summary = run_yolo_training_job(
+            data_yaml=Path(args.data_yaml).resolve(),
+            model_name=str(args.model),
+            epochs=int(args.epochs),
+            imgsz=int(args.imgsz),
+            batch=int(args.batch),
+            device=str(args.device),
+            project_dir=Path(args.project_dir).resolve(),
+            run_name=str(args.run_name),
+            dry_run=bool(args.dry_run),
+        )
+        print(json.dumps(summary, indent=2))
+        return 0
+
+    if args.command == "promote-model":
+        summary = promote_model_weights(
+            weights_path=Path(args.weights).resolve(),
+            target_dir=Path(args.target_dir).resolve(),
+            config_path=Path(args.config_path).resolve(),
+            target_filename=str(args.model_key),
+            enable_yolo=bool(args.enable_yolo),
         )
         print(json.dumps(summary, indent=2))
         return 0

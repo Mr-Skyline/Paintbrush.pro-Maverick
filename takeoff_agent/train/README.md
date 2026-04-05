@@ -69,6 +69,41 @@ Outputs:
 - `report.json`
 - `summary.csv`
 
+## Run a YOLO wall training job
+
+This command launches an Ultralytics training run and writes run metadata:
+
+```bash
+python -m takeoff_agent.train.cli run-yolo-train \
+  --data-yaml /workspace/takeoff_agent/train/datasets/fresh_start/data.yaml \
+  --model yolo11n.pt \
+  --epochs 50 \
+  --imgsz 1024 \
+  --out-dir /workspace/takeoff_agent/train/runs \
+  --run-name walls_baseline
+```
+
+Outputs under run folder:
+
+- `train_job.json` (parameters + detected best weight path)
+- Ultralytics `weights/best.pt` (if training succeeds)
+
+## Promote trained model into runtime config
+
+Copy selected weights into `takeoff_agent/models/` and patch `takeoff_agent/config.yaml`
+to enable YOLO wall inference:
+
+```bash
+python -m takeoff_agent.train.cli promote-wall-model \
+  --weights /workspace/takeoff_agent/train/runs/walls_baseline/weights/best.pt \
+  --config /workspace/takeoff_agent/config.yaml
+```
+
+This updates:
+
+- `detection.walls.yolo.enabled = true`
+- `detection.walls.yolo.model_path = <copied path>`
+
 ### Notes
 
 - Upload is best-effort; local dataset initialization always works.
