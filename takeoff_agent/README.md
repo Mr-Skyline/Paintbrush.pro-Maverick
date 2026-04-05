@@ -28,21 +28,24 @@ Run multiple jobs from a queue JSON file:
 ```bash
 python -m takeoff_agent.batch_runner \
   --queue takeoff_agent/batch_queue.example.json \
-  --continue-on-error
+  --max-concurrent 2
 ```
 
 Queue format:
 
 ```json
-[
-  {
-    "input": "/abs/path/plan1.png",
-    "project_id": "job-001",
-    "out": "/abs/path/output/job-001",
-    "save_overlays": true,
-    "enable_supabase_handoff": true
-  }
-]
+{
+  "jobs": [
+    {
+      "id": "job-001",
+      "input": "/abs/path/plan1.png",
+      "project_id": "job-001",
+      "out": "/abs/path/output/job-001",
+      "save_overlays": true,
+      "enable_supabase_handoff": true
+    }
+  ]
+}
 ```
 
 Each run writes a deterministic `idempotency_key` into:
