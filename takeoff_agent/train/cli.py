@@ -7,6 +7,7 @@ from pathlib import Path
 from .eval import evaluate_runs_root
 from .fresh_start import initialize_fresh_dataset
 from .dataset_ops import generate_yolo_data_yaml
+from .ingest import ingest_pdf_folder
 from .roboflow_client import upload_images
 from .train_jobs import promote_model_weights, run_yolo_training_job
 
@@ -90,6 +91,58 @@ def parse_args() -> argparse.Namespace:
         "--class-names",
         default="exterior_wall,interior_wall,door,window,fixture",
         help="Comma-separated class names in index order.",
+    )
+
+    ingest_cmd = sub.add_parser(
+        "ingest-pdf-folder",
+        help="Incrementally ingest PDF/Word docs into dataset page images.",
+    )
+    ingest_cmd.add_argument(
+        "--source-dir",
+        default="/workspace/data/training/raw_pdfs",
+        help="Folder containing source PDF plans to ingest.",
+    )
+    ingest_cmd.add_argument(
+        "--dataset-root",
+        default="takeoff_agent/train/datasets/fresh_start",
+        help="Dataset root containing images/ and labels/ folders.",
+    )
+    ingest_cmd.add_argument(
+        "--split",
+        default="train",
+        choices=["train", "val", "test"],
+        help="Dataset split to place generated images in.",
+    )
+    ingest_cmd.add_argument(
+        "--dpi",
+        type=int,
+        default=300,
+        help="PDF render DPI for generated images.",
+    )
+    ingest_cmd.add_argument(
+        "--non-recursive",
+        action="store_false",
+        dest="recursive",
+        help="Only scan top-level files in source dir.",
+    )
+    ingest_cmd.set_defaults(recursive=True)
+    ingest_cmd.add_argument(
+        "--limit-files",
+        "--limit-pdfs",
+        dest="limit_files",
+        type=int,
+        default=0,
+        help="Maximum source files to ingest in this run (0 = all pending).",
+    )
+    ingest_cmd.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-ingest even if file fingerprint has not changed.",
+    )
+    ingest_cmd.add_argument(
+        "--clean-removed",
+        action="store_true",
+        help="Remove generated pages from dataset when source PDFs are deleted.",
     )
 
     eval_cmd = sub.add_parser(
@@ -240,6 +293,20 @@ def main() -> int:
         print(
             f"Image counts train/val/test: {summary.train_count}/{summary.val_count}/{summary.test_count}"
         )
+        return 0
+
+    if args.command == "ingest-pdf-folder":
+        summary = ingest_pdf_folder(
+            source_dir=Path(args.source_dir).resolve(),
+            dataset_root=Path(args.dataset_root).resolve(),
+            split=str(args.split),
+            dpi=int(args.dpi),
+            recursive=bool(args.recursive),
+            limit_pdfs=int(args.limit_files),
+            force=bool(args.force),
+            clean_removed=bool(args.clean_removed),
+        )
+        print(json.dumps(summary.to_dict(), indent=2))
         return 0
 
     if args.command == "evaluate-runs":

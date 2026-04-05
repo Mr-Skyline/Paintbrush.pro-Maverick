@@ -20,6 +20,34 @@ This creates:
 Add your first fresh images into one split folder (for example `images/train`),
 and create matching YOLO label files in `labels/train`.
 
+### Incremental document-folder ingestion (idempotent)
+
+Point this at a folder you keep populating with new files. It processes only:
+
+- PDF (`.pdf`)
+- Word (`.doc`, `.docx`)
+
+Excel files are intentionally ignored.
+
+It only processes new or changed documents and tracks state in a local ingest DB:
+
+```bash
+python -m takeoff_agent.train.cli ingest-pdf-folder \
+  --source-dir /workspace/data/training/raw_pdfs \
+  --dataset-root /workspace/takeoff_agent/train/datasets/fresh_start \
+  --split train \
+  --recursive
+```
+
+Optional knobs:
+
+- `--limit-files 25` to process only the first N pending files in a pass
+- `--dpi 300` for conversion quality
+- `--force` to reprocess unchanged files
+- `--clean-removed` to remove generated pages when source docs are deleted
+
+Re-running the same command is safe; unchanged PDFs are skipped automatically.
+
 ### Upload fresh images to Roboflow
 
 ```bash
@@ -74,12 +102,12 @@ Outputs:
 This command launches an Ultralytics training run and writes run metadata:
 
 ```bash
-python -m takeoff_agent.train.cli run-yolo-train \
+python -m takeoff_agent.train.cli train-yolo-walls \
   --data-yaml /workspace/takeoff_agent/train/datasets/fresh_start/data.yaml \
   --model yolo11n.pt \
   --epochs 50 \
   --imgsz 1024 \
-  --out-dir /workspace/takeoff_agent/train/runs \
+  --project-dir /workspace/takeoff_agent/train/runs \
   --run-name walls_baseline
 ```
 
@@ -94,9 +122,10 @@ Copy selected weights into `takeoff_agent/models/` and patch `takeoff_agent/conf
 to enable YOLO wall inference:
 
 ```bash
-python -m takeoff_agent.train.cli promote-wall-model \
+python -m takeoff_agent.train.cli promote-model \
   --weights /workspace/takeoff_agent/train/runs/walls_baseline/weights/best.pt \
-  --config /workspace/takeoff_agent/config.yaml
+  --config-path /workspace/takeoff_agent/config.yaml \
+  --enable-yolo
 ```
 
 This updates:
@@ -109,31 +138,3 @@ This updates:
 - Upload is best-effort; local dataset initialization always works.
 - This flow intentionally starts from scratch and avoids existing run artifacts.
 
-## Prepare YOLO training metadata
-
-After you add images + labels, generate a YOLO dataset yaml:
-
-```bash
-python -m takeoff_agent.train.cli generate-yolo-yaml \
-  --dataset-root /workspace/takeoff_agent/train/datasets/fresh_start
-```
-
-This writes:
-
-- `yolo_data.yaml` (train/val/test image paths + class names)
-
-## Evaluate takeoff outputs (local harness)
-
-Generate a quality report from one or more existing run outputs:
-
-```bash
-python -m takeoff_agent.train.cli eval-runs \
-  --runs-root /workspace/output \
-  --out-dir /workspace/takeoff_agent/train/eval/latest \
-  --confidence-threshold 0.90
-```
-
-This writes:
-
-- `report.json`
-- `summary.csv`
