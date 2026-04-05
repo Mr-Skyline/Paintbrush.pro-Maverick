@@ -48,6 +48,26 @@ Optional knobs:
 
 Re-running the same command is safe; unchanged PDFs are skipped automatically.
 
+### Continuous watch mode (autonomous ingestion loop)
+
+Use watch mode when you're actively dropping many files/folders over time. It
+runs recurring recursive scans and ingests only new/changed PDF+Word files:
+
+```bash
+python -m takeoff_agent.train.cli ingest-pdf-folder \
+  --source-dir /workspace/data/training/raw_pdfs \
+  --dataset-root /workspace/takeoff_agent/train/datasets/fresh_start \
+  --split train \
+  --watch \
+  --watch-interval-seconds 60
+```
+
+Optional watch controls:
+
+- `--watch-max-runs 120` stop after N scan cycles (0 = run forever)
+- `--watch-sleep-when-idle-seconds 120` longer sleep when no changes were processed
+- `--watch-summary-out /workspace/output/ingest-watch/latest.json` write loop summary JSON
+
 ### Upload fresh images to Roboflow
 
 ```bash

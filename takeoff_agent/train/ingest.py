@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import shutil
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +47,64 @@ class IngestSummary:
         payload["state_path"] = str(self.state_path)
         payload["manifest_path"] = str(self.manifest_path)
         return payload
+
+
+@dataclass(slots=True)
+class IngestWatchIteration:
+    run_index: int
+    started_at_utc: str
+    completed_at_utc: str
+    duration_seconds: float
+    summary: IngestSummary
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "run_index": self.run_index,
+            "started_at_utc": self.started_at_utc,
+            "completed_at_utc": self.completed_at_utc,
+            "duration_seconds": self.duration_seconds,
+            "summary": self.summary.to_dict(),
+        }
+
+
+@dataclass(slots=True)
+class IngestWatchSummary:
+    source_dir: Path
+    dataset_root: Path
+    split: str
+    interval_seconds: int
+    max_runs: int
+    started_at_utc: str
+    completed_at_utc: str
+    total_duration_seconds: float
+    runs_executed: int
+    total_scanned_files: int
+    total_processed_files: int
+    total_skipped_files: int
+    total_pages_written: int
+    total_documents_copied: int
+    total_failed_files: int
+    iterations: list[IngestWatchIteration]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_dir": str(self.source_dir),
+            "dataset_root": str(self.dataset_root),
+            "split": self.split,
+            "interval_seconds": self.interval_seconds,
+            "max_runs": self.max_runs,
+            "started_at_utc": self.started_at_utc,
+            "completed_at_utc": self.completed_at_utc,
+            "total_duration_seconds": self.total_duration_seconds,
+            "runs_executed": self.runs_executed,
+            "total_scanned_files": self.total_scanned_files,
+            "total_processed_files": self.total_processed_files,
+            "total_skipped_files": self.total_skipped_files,
+            "total_pages_written": self.total_pages_written,
+            "total_documents_copied": self.total_documents_copied,
+            "total_failed_files": self.total_failed_files,
+            "iterations": [iteration.to_dict() for iteration in self.iterations],
+        }
 
 
 def _now_iso() -> str:
@@ -503,5 +562,80 @@ def ingest_pdf_folder(
         state_path=state_path,
         manifest_path=manifest_path,
         failures=failures,
+    )
+
+
+def watch_ingest_folder(
+    *,
+    source_dir: Path,
+    dataset_root: Path,
+    split: str,
+    interval_seconds: int = 30,
+    max_runs: int = 0,
+    dpi: int = 220,
+    recursive: bool = True,
+    limit_files: int = 0,
+    force: bool = False,
+    clean_removed: bool = False,
+    write_label_stubs: bool = True,
+) -> IngestWatchSummary:
+    if interval_seconds < 1:
+        raise ValueError("interval_seconds must be >= 1")
+    if max_runs < 0:
+        raise ValueError("max_runs must be >= 0")
+
+    run_limit = max_runs if max_runs > 0 else 10**9
+    iterations: list[IngestWatchIteration] = []
+    started_at_utc = _now_iso()
+    started = time.perf_counter()
+
+    for run_index in range(1, run_limit + 1):
+        run_started_utc = _now_iso()
+        run_started = time.perf_counter()
+        summary = ingest_pdf_folder(
+            source_dir=source_dir,
+            dataset_root=dataset_root,
+            split=split,
+            dpi=dpi,
+            recursive=recursive,
+            limit_pdfs=limit_files,
+            force=force,
+            clean_removed=clean_removed,
+            write_label_stubs=write_label_stubs,
+        )
+        run_duration = round(time.perf_counter() - run_started, 3)
+        iterations.append(
+            IngestWatchIteration(
+                run_index=run_index,
+                started_at_utc=run_started_utc,
+                completed_at_utc=_now_iso(),
+                duration_seconds=run_duration,
+                summary=summary,
+            )
+        )
+
+        if run_index >= run_limit:
+            break
+        time.sleep(interval_seconds)
+
+    completed_at_utc = _now_iso()
+    total_duration_seconds = round(time.perf_counter() - started, 3)
+    return IngestWatchSummary(
+        source_dir=source_dir.resolve(),
+        dataset_root=dataset_root.resolve(),
+        split=split.strip().lower(),
+        interval_seconds=interval_seconds,
+        max_runs=max_runs,
+        started_at_utc=started_at_utc,
+        completed_at_utc=completed_at_utc,
+        total_duration_seconds=total_duration_seconds,
+        runs_executed=len(iterations),
+        total_scanned_files=sum(it.summary.scanned_files for it in iterations),
+        total_processed_files=sum(it.summary.processed_files for it in iterations),
+        total_skipped_files=sum(it.summary.skipped_files for it in iterations),
+        total_pages_written=sum(it.summary.pages_written for it in iterations),
+        total_documents_copied=sum(it.summary.documents_copied for it in iterations),
+        total_failed_files=sum(it.summary.failed_files for it in iterations),
+        iterations=iterations,
     )
 

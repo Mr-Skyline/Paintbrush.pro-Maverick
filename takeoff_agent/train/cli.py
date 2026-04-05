@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 from .eval import evaluate_runs_root
@@ -149,6 +150,23 @@ def parse_args() -> argparse.Namespace:
         "--clean-removed",
         action="store_true",
         help="Remove generated pages from dataset when source PDFs are deleted.",
+    )
+    ingest_cmd.add_argument(
+        "--watch",
+        action="store_true",
+        help="Continuously re-scan source folder on a timer.",
+    )
+    ingest_cmd.add_argument(
+        "--watch-interval-seconds",
+        type=float,
+        default=30.0,
+        help="Polling interval in seconds when --watch is enabled.",
+    )
+    ingest_cmd.add_argument(
+        "--watch-max-runs",
+        type=int,
+        default=0,
+        help="Max watch iterations (0 = run forever until interrupted).",
     )
 
     eval_cmd = sub.add_parser(
@@ -302,17 +320,54 @@ def main() -> int:
         return 0
 
     if args.command == "ingest-pdf-folder":
-        summary = ingest_pdf_folder(
-            source_dir=Path(args.source_dir).resolve(),
-            dataset_root=Path(args.dataset_root).resolve(),
-            split=str(args.split),
-            dpi=int(args.dpi),
-            recursive=bool(args.recursive),
-            limit_pdfs=int(args.limit_files),
-            force=bool(args.force),
-            clean_removed=bool(args.clean_removed),
-        )
-        print(json.dumps(summary.to_dict(), indent=2))
+        source_dir = Path(args.source_dir).resolve()
+        dataset_root = Path(args.dataset_root).resolve()
+        split = str(args.split)
+        dpi = int(args.dpi)
+        recursive = bool(args.recursive)
+        limit_files = int(args.limit_files)
+        force = bool(args.force)
+        clean_removed = bool(args.clean_removed)
+
+        if not bool(args.watch):
+            summary = ingest_pdf_folder(
+                source_dir=source_dir,
+                dataset_root=dataset_root,
+                split=split,
+                dpi=dpi,
+                recursive=recursive,
+                limit_pdfs=limit_files,
+                force=force,
+                clean_removed=clean_removed,
+            )
+            print(json.dumps(summary.to_dict(), indent=2))
+            return 0
+
+        interval = max(1.0, float(args.watch_interval_seconds))
+        max_runs = max(0, int(args.watch_max_runs))
+        run_count = 0
+        while True:
+            run_count += 1
+            summary = ingest_pdf_folder(
+                source_dir=source_dir,
+                dataset_root=dataset_root,
+                split=split,
+                dpi=dpi,
+                recursive=recursive,
+                limit_pdfs=limit_files,
+                force=force,
+                clean_removed=clean_removed,
+            )
+            envelope = {
+                "watch_run": run_count,
+                "watch_interval_seconds": interval,
+                "watch_max_runs": max_runs,
+                "summary": summary.to_dict(),
+            }
+            print(json.dumps(envelope, indent=2), flush=True)
+            if max_runs > 0 and run_count >= max_runs:
+                break
+            time.sleep(interval)
         return 0
 
     if args.command == "evaluate-runs":
