@@ -209,7 +209,7 @@ def mark_processed(
     fingerprint: str,
     attempt_json: pathlib.Path,
     project: str,
-    event_count: int,
+    events: List[Dict[str, str]],
 ) -> None:
     state = read_json(state_path, {"processed": {}})
     if not isinstance(state, dict):
@@ -221,9 +221,24 @@ def mark_processed(
     processed[fingerprint] = {
         "attempt_json": str(attempt_json),
         "project": project,
-        "event_count": event_count,
+        "event_count": len(events),
         "logged_at": utc_now_iso(),
     }
+    latest_failure = state.setdefault("latest_failure_by_archetype", {})
+    if not isinstance(latest_failure, dict):
+        latest_failure = {}
+        state["latest_failure_by_archetype"] = latest_failure
+    for event in events:
+        if str(event.get("outcome", "")).lower() != "failure":
+            continue
+        archetype = str(event.get("archetype", "")).strip()
+        if not archetype:
+            continue
+        latest_failure[archetype] = {
+            "attempt_json": str(attempt_json),
+            "project": project,
+            "logged_at": utc_now_iso(),
+        }
     write_json(state_path, state)
 
 
@@ -328,7 +343,7 @@ def main() -> int:
             fingerprint=fingerprint,
             attempt_json=attempt_json,
             project=project,
-            event_count=len(events),
+            events=events,
         )
 
     print(

@@ -1071,7 +1071,29 @@ class MaverickRuntime:
                     out["evidence_dir"] = str(latest[0].parent)
         elif "left-blank" in a:
             left_blank_root = self.root / "output/ost-condition-takeoff"
-            if left_blank_root.exists():
+            attempt_json: Optional[pathlib.Path] = None
+            bridge_state = self.output_root / "left_blank_bridge_state.json"
+            if bridge_state.exists():
+                bridge_payload = read_json(bridge_state, {})
+                latest_failure = (
+                    bridge_payload.get("latest_failure_by_archetype", {})
+                    if isinstance(bridge_payload, dict)
+                    else {}
+                )
+                if isinstance(latest_failure, dict):
+                    attempt_raw = (
+                        latest_failure.get(a, {})
+                        if isinstance(latest_failure.get(a, {}), dict)
+                        else {}
+                    )
+                    raw_path = str((attempt_raw or {}).get("attempt_json", "") or "").strip()
+                    if raw_path:
+                        p = pathlib.Path(raw_path)
+                        if not p.is_absolute():
+                            p = self.root / p
+                        if p.exists():
+                            attempt_json = p
+            if attempt_json is None and left_blank_root.exists():
                 latest = sorted(
                     [p for p in left_blank_root.rglob("left_blank_takeoff_attempt.json") if p.is_file()],
                     key=lambda p: p.stat().st_mtime,
@@ -1079,25 +1101,26 @@ class MaverickRuntime:
                 )
                 if latest:
                     attempt_json = latest[0]
-                    out["attempt_json"] = str(attempt_json)
-                    out["evidence_dir"] = str(attempt_json.parent)
-                    payload = read_json(attempt_json, {})
-                    if isinstance(payload, dict):
-                        for key in ("pre_attempt_screenshot", "pre_click_verify_screenshot", "evidence_screenshot"):
-                            raw = str(payload.get(key, "") or "").strip()
-                            if not raw:
-                                continue
-                            p = pathlib.Path(raw)
-                            if not p.is_absolute():
-                                p = self.root / p
-                            if p.exists():
-                                out.setdefault("screenshots", []).append(str(p))
-                        cleanup_path = attempt_json.parent / "after_cleanup.png"
-                        if cleanup_path.exists():
-                            out.setdefault("screenshots", []).append(str(cleanup_path))
-                        reason = str(payload.get("reason", "") or "").strip()
-                        if reason:
-                            out["reason"] = reason
+            if attempt_json is not None:
+                out["attempt_json"] = str(attempt_json)
+                out["evidence_dir"] = str(attempt_json.parent)
+                payload = read_json(attempt_json, {})
+                if isinstance(payload, dict):
+                    for key in ("pre_attempt_screenshot", "pre_click_verify_screenshot", "evidence_screenshot"):
+                        raw = str(payload.get(key, "") or "").strip()
+                        if not raw:
+                            continue
+                        p = pathlib.Path(raw)
+                        if not p.is_absolute():
+                            p = self.root / p
+                        if p.exists():
+                            out.setdefault("screenshots", []).append(str(p))
+                    cleanup_path = attempt_json.parent / "after_cleanup.png"
+                    if cleanup_path.exists():
+                        out.setdefault("screenshots", []).append(str(cleanup_path))
+                    reason = str(payload.get("reason", "") or "").strip()
+                    if reason:
+                        out["reason"] = reason
         return out
 
     def failure_trends(self, project: str, top: int = 10) -> Dict[str, Any]:
