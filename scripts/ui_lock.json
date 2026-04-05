@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "generatedAt": "2026-04-05T16:07:18.442Z",
+  "note": "UI lock baseline. Update intentionally via: npm run ui:lock:update",
+  "files": {
+    "src/index.css": "1ac8d5da8e4b7272c6a0c11db0b4181d07a5dd7c597cd22335525ee1938c4af1",
+    "src/components/WorkspaceLayout.tsx": "01fea565c4ff5a37b3600df9d23b14ab1fedfa846c6e87a92773ae41334ea562",
+    "src/components/TraceWindow.tsx": "1af83a27e856503958f76510950acc290dd5931d1f33e4e20022ab93de9460a9",
+    "src/components/AgentTracePanel.tsx": "417ebb29548200cdd0e60c1c98a1f317529f713d201b0a019f58d220802c48de",
+    "src/components/TraceViewerPanel.tsx": "9736fde9bf2c296937f971cd10bbf515a0dce59ec4f4610042fd78d9ab4ca105",
+    "src/components/ReviewPanel.tsx": "3fd9c29df5e812366c998d042ff47e0b8af56cf782d9f2ef3bd3dcb6d348008a",
+    "src/components/ToolbarOST.tsx": "af8f091cb021a0a1b5e5a497d8a8459abb9f84a62971c89b1030453e1aacccdb",
+    "src/components/CanvasWorkspace.tsx": "5d68e18540fb3fd02b384e7bf7d04efcfefb9b1052e92cf5a77e0322b3a26757",
+    "src/components/RightSidebarProperties.tsx": "2d2aaac06a6db99c59c0bb99f0100c4e8188bc8e447645d9dc3530c1bee26792",
+    "src/components/BoostDialog.tsx": "0a1d498424c192ab1763838ae0d02a2f3a961cab96398e6f7b633911a7366997",
+    "src/components/StatusBar.tsx": "e5a13a28c225c20a57cb91bde6f5ba7674a3078fd86eb9e493c7b2a55c0bdb7c",
+    "src/components/VoiceControls.tsx": "7c0316c795248c6d1cc147e44a26f85fa6dd1738d26b3ab28feef8497eecd60d",
+    "src/components/SidebarLeft.tsx": "04c940bfc211e115250e03aeae52bd3cf1f6a0c5198c90f1e375e6b4ac084f54",
+    "src/components/ConditionEditorModal.tsx": "eab7ba5d8268d3ffe2312a5206730409965cbd2bbb3d65e194a025f2d9de17d3",
+    "src/screens/NewProjectScreen.tsx": "ce92ff837ec052ed8efa80137e8f1ca8450f05f09e62b40c89d2290714cfbdf7",
+    "src/screens/DesktopInvoiceScreen.tsx": "5ef7b62b58e40890a73baeedaea1c6c3f0cbb3f59d9c75f3ecace173098917a9",
+    "src/screens/ProjectListScreen.tsx": "1966a58548e9ad82b0946332e03f71d5969621308a3d4edd8b1f70d2f719980e"
+  }
+}
